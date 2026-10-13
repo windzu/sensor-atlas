@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="八项简单可行的 LiDAR 硬件评测：有效距离、测距精度、强反鬼影、拖尾、玻璃、湿地面、雾与喷雾、窗口脏污。包含交互原理动画、录包回放步骤和报告内容。">
+  <meta name="theme-color" content="#123b3c">
+  <meta property="og:title" content="LiDAR 硬件评测｜Sensor Atlas">
+  <meta property="og:description" content="用常见目标与真实场景，通过连续录包和回放检查点云质量。八项评测，八个原理动画。">
+  <title>LiDAR 硬件评测｜Sensor Atlas</title>
+  <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./assets/style.css">
+  <script type="module" src="./assets/app.js"></script>
+</head>
+<body class="guide-page">
+  <a class="skip-link" href="#guide-main">跳到正文</a>
+  <header class="site-header"><div class="header-inner"><a class="brand" href="./" aria-label="Sensor Atlas 首页"><img src="./assets/mark.svg" width="35" height="35" alt=""><span>sensor<span class="brand-light">atlas</span><span class="brand-dot">.</span></span></a><nav aria-label="主导航"><a href="./#topics">专题目录</a><a class="current" href="lidar.html">LiDAR 评测</a><a class="github-link" href="https://github.com/windzu/sensor-atlas" target="_blank" rel="noopener noreferrer">GitHub ↗</a></nav></div></header>
+  <section class="guide-heading wrap"><div><a class="breadcrumb" href="./#topics">图谱 <span aria-hidden="true">/</span> CHAPTER 01</a><h1>LiDAR 硬件评测<span class="chapter-label mono">FIELD GUIDE</span></h1><p>常见目标，连续录包，回放检查。八项点云质量评测，从原理到现场。</p></div><a class="button secondary download-link" href="./downloads/lidar-hardware-evaluation.md" download>下载标准 <span aria-hidden="true">↓</span></a></section>
+  <div class="guide-layout wrap">
+    <aside class="topic-sidebar"><p class="eyebrow">评测目录 <span class="mono">01—08</span></p><nav class="topic-nav" role="tablist" aria-label="LiDAR 评测项目" aria-orientation="vertical">{{TOPIC_NAV}}</nav><div class="sidebar-note"><span class="mono">READ · RECORD · REPLAY</span><p>先看原理，再按步骤录包。<br>动画帮助理解，实测以回放为准。</p></div></aside>
+    <main id="guide-main" class="guide-main">
+      <div class="mobile-topic-picker"><label for="topic-select">选择评测项目</label><select id="topic-select">{{TOPIC_OPTIONS}}</select></div>
+      <noscript><div class="notice">原理动画需要 JavaScript。以下八项测试正文仍可直接阅读，也可以下载 Markdown 标准。</div></noscript>
+      {{TOPIC_PANELS}}
+      <div class="guide-pagination"><button class="pagination-prev" type="button">← 上一项</button><span class="mono pagination-count">01 / 08</span><button class="pagination-next" type="button">下一项 →</button></div>
+      <details class="sources-block"><summary>参考资料 <span class="mono">PRIMARY SOURCES</span></summary><ul>{{SOURCE_LINKS}}</ul></details>
+      <div class="guide-disclaimer">页面动画是定性原理示意，不对应某一型号的性能数据。当前标准包含测试方法，实测案例尚待补充。</div>
+    </main>
+  </div>
+  <footer class="site-footer wrap"><a class="brand footer-brand" href="./">Sensor Atlas<span class="brand-dot">.</span></a><span>自驾与机器人传感器指南</span><a href="https://github.com/windzu/sensor-atlas" target="_blank" rel="noopener noreferrer">公开仓库 ↗</a></footer>
+</body>
+</html>
