@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-13",
+  "request": "Improve the aesthetics of a code-driven interactive 3D animation; a generated product render is not the deliverable.",
+  "status": "Reference research; scene implementation has not been changed in this pass.",
+  "currentImplementation": {
+    "path": "web/assets/animation.js",
+    "finding": "3D geometry is manually projected onto a 2D Canvas. Surface color and alpha are drawn per polygon; there is no lighting/material/shadow rendering pipeline.",
+    "implication": "A complete realtime 3D rendering pipeline would support better materials and spatial lighting, but library choice alone does not guarantee aesthetic quality."
+  },
+  "references": [
+    {
+      "title": "Ryan Sael — Interactive camera focus lens lab",
+      "original": "https://x.com/RyanSael/status/2102591147927654847",
+      "accessibleArchive": "https://jasonzhu.ai/en/prompts/claude-opus-5-5/2102591147927654847",
+      "evidence": "Inspected the accessible demonstration recording at beginning, midpoint and end. Case archive attributes the result to Opus 5.5 and notes prior project reference assets. Original X post was not retrievable through web tools; model attribution was not independently reproduced.",
+      "observations": [
+        "Detailed layered hardware geometry, curved lenses, structural thickness and repeated assembly details.",
+        "Light and reflections differentiate the materials and make shadowed geometry readable.",
+        "Camera transition to the image plane remains part of the same coherent staged environment."
+      ],
+      "apply": "Use as the primary medium reference for a realtime LiDAR scene; study the quality of the code-rendered scene rather than treating the recording as the final output."
+    },
+    {
+      "title": "Meng To — Playable boat scene through Japanese landscapes",
+      "original": "https://x.com/MengTo/status/2102760783344189761",
+      "accessibleArchive": "https://jasonzhu.ai/en/prompts/claude-opus-5-5/2102760783344189761",
+      "evidence": "Read the archived creator prompt and inspected the video poster. Playback did not load, so no claim of fully watching the animation. The archive lists Three.js and creator-provided instructions.",
+      "observations": [
+        "Prompt defines geometry detail, materials, lighting, composition, camera, coordinated movement, performance and browser visual checks as one art-direction specification.",
+        "It explicitly requires shaped geometry and readable details instead of leaving primitives as final models."
+      ],
+      "apply": "Write concrete scene and acceptance constraints before implementation; do not rely on a vague request for a professional 3D look."
+    },
+    {
+      "title": "Addy Osmani — Pelican riding a bike in Three.js",
+      "original": "https://x.com/addyosmani/status/2102436416437580159",
+      "accessibleArchive": "https://jasonzhu.ai/en/prompts/claude-opus-5-5/2102436416437580159",
+      "evidence": "Read the archived creator brief and tool attribution. No source code inspected or result independently reproduced.",
+      "apply": "Evidence that the desired deliverable category is a playable browser scene. Do not infer the short prompt alone guarantees the reported quality."
+    }
+  ],
+  "technicalSources": [
+    {
+      "title": "Three.js WebGLRenderer",
+      "url": "https://threejs.org/docs/pages/WebGLRenderer.html"
+    },
+    {
+      "title": "Three.js MeshStandardMaterial",
+      "url": "https://threejs.org/docs/pages/MeshStandardMaterial.html"
+    },
+    {
+      "title": "Three.js OrbitControls",
+      "url": "https://threejs.org/docs/pages/OrbitControls.html"
+    }
+  ],
+  "nextSceneConstraints": [
+    "Deliver a running browser scene with user rotation, camera zoom and meaningful pause controls.",
+    "Shape the sensor with curves, bevels, surface thickness and coherent component hierarchy; geometry remains part of the realtime scene.",
+    "Use a restrained shared palette and lighting to reveal material differences and depth. No dependence on a giant grid for spatial readability.",
+    "Design framing around the sensor and its optical window; check the user's narrow side-panel viewport as well as a wide viewport.",
+    "Keep scanning motion, droplet movement, contamination transitions and camera transitions coordinated and smoothly eased.",
+    "Take any design keyframe directly from the running scene. Do not substitute ImageGen product photography for the interactive animation.",
+    "Keep the LiDAR effect qualitative and label it accordingly; no invented performance metrics."
+  ]
+}

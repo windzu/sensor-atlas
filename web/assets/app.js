@@ -1,39 +1,67 @@
 import { AtlasScene } from './animation.js';
 
-const scenes = [...document.querySelectorAll('canvas[data-scene]')].map((canvas) => new AtlasScene(canvas));
+const canvases = [...document.querySelectorAll('canvas[data-scene]')];
+let LowPolyScene;
+try { ({ LowPolyScene } = await import('./lowpoly-scene.js')); }
+catch (error) { console.warn('3D scenes unavailable; using the geometric view.', error); }
+const scenes = canvases.map((canvas) => {
+  if (LowPolyScene) {
+    try { return new LowPolyScene(canvas); }
+    catch (error) { console.warn('WebGL unavailable; using the geometric view.', error); }
+  }
+  return new AtlasScene(canvas);
+});
 const sceneFor = (canvas) => scenes.find((scene) => scene.canvas === canvas);
-const fmt = (value, unit) => unit === 'level' ? (value === 0 ? '无影响示意' : value <= 30 ? '轻微' : value <= 60 ? '中等' : '明显') : value + ' ' + unit;
+const fmt = (value, unit) => unit === 'level' ? (value === 0 ? '无影响参考' : value <= 30 ? '轻微' : value <= 60 ? '中等' : '明显') : value + ' ' + unit;
 
 for (const panel of document.querySelectorAll('.topic-panel')) {
-  const canvas = panel.querySelector('canvas'), scene = sceneFor(canvas);
+  const scene = sceneFor(panel.querySelector('canvas[data-scene]'));
   const slider = panel.querySelector('input[type=range]'), output = panel.querySelector('output');
-  const play = panel.querySelector('.play-button');
+  const play = panel.querySelector('.play-button'), baseline = panel.querySelector('.baseline-button');
   const original = Number(slider.value);
+  const group = (selector, attribute, value) => {
+    for (const button of panel.querySelectorAll(selector)) {
+      const active = button.getAttribute(attribute) === value;
+      button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active));
+    }
+  };
   function refreshPlay() {
-    play.innerHTML = scene.paused ? '播放动画 <span aria-hidden="true">▶</span>' : '暂停动画 <span aria-hidden="true">Ⅱ</span>';
+    play.innerHTML = scene.paused ? '播放 <span aria-hidden="true">▶</span>' : '暂停 <span aria-hidden="true">Ⅱ</span>';
     play.setAttribute('aria-pressed', String(scene.paused));
+    play.setAttribute('aria-label', scene.paused ? '播放演示' : '暂停演示');
   }
-  function refreshValue() { output.textContent = fmt(Number(slider.value), slider.dataset.unit); scene.update(slider.value); }
+  function refreshBaseline() {
+    baseline.setAttribute('aria-pressed', String(scene.baseline));
+    baseline.textContent = scene.baseline ? '返回当前条件' : '查看基准';
+    baseline.setAttribute('aria-label', scene.baseline ? '返回当前条件' : '查看' + baseline.dataset.baselineLabel);
+    slider.disabled = scene.baseline;
+    const value = scene.baseline ? Number(slider.min) : Number(slider.value);
+    output.textContent = (scene.baseline ? '基准 · ' : '') + fmt(value, slider.dataset.unit);
+    slider.setAttribute('aria-valuetext', output.textContent);
+  }
+  function refreshValue() { scene.update(slider.value); refreshBaseline(); }
+  scene.onPause = refreshPlay;
+  scene.onPhase = (phase) => group('[data-phase]', 'data-phase', String(phase));
+  scene.onView = (view) => group('[data-view]', 'data-view', view);
   slider.addEventListener('input', refreshValue);
   play.addEventListener('click', () => { scene.paused = !scene.paused; refreshPlay(); scene.draw(); });
-  panel.querySelector('.reset-button').addEventListener('click', () => {
-    slider.value = original;
-    const first = panel.querySelector('[data-target]');
-    if (first) first.click();
-    scene.time = 0; refreshValue();
+  baseline.addEventListener('click', () => { scene.setBaseline(!scene.baseline); refreshBaseline(); });
+  for (const button of panel.querySelectorAll('[data-target]')) button.addEventListener('click', () => {
+    scene.targetKind = button.dataset.target; group('[data-target]', 'data-target', button.dataset.target); scene.rebuild(); scene.draw();
   });
-  for (const target of panel.querySelectorAll('[data-target]')) {
-    target.addEventListener('click', () => {
-      scene.targetKind = target.dataset.target;
-      for (const button of panel.querySelectorAll('[data-target]')) {
-        const active = button === target;
-        button.classList.toggle('active', active);
-        button.setAttribute('aria-pressed', String(active));
-      }
-      scene.draw();
-    });
-  }
-  refreshPlay(); refreshValue();
+  for (const button of panel.querySelectorAll('[data-mode]')) button.addEventListener('click', () => {
+    scene.mode = button.dataset.mode; group('[data-mode]', 'data-mode', scene.mode); scene.draw();
+  });
+  for (const button of panel.querySelectorAll('[data-view]')) button.addEventListener('click', () => {
+    scene.setView(button.dataset.view); scene.onView(scene.view);
+  });
+  for (const button of panel.querySelectorAll('[data-phase]')) button.addEventListener('click', () => scene.setPhase(Number(button.dataset.phase)));
+  panel.querySelector('.reset-button').addEventListener('click', () => {
+    slider.value = original; scene.paused = scene.motionPreference.matches; scene.reset();
+    group('[data-target]', 'data-target', 'person'); group('[data-mode]', 'data-mode', 'compare');
+    scene.onView('orbit'); scene.onPhase(scene.phase); refreshValue(); refreshPlay();
+  });
+  refreshPlay(); refreshValue(); scene.onPhase(scene.phase);
 }
 
 const hero = document.querySelector('.hero-canvas');
@@ -44,6 +72,7 @@ if (hero) {
     pause.setAttribute('aria-pressed', String(scene.paused));
     pause.setAttribute('aria-label', scene.paused ? '播放首页动画' : '暂停首页动画');
   }
+  scene.onPause = refresh;
   pause.addEventListener('click', () => { scene.paused = !scene.paused; refresh(); scene.draw(); });
   refresh();
 }
@@ -58,23 +87,19 @@ if (tabs.length) {
     let index = panels.findIndex((panel) => panel.id === id);
     if (index < 0) index = 0;
     active = index;
-    panels.forEach((panel, i) => {
-      panel.classList.toggle('is-active', i === index);
-      panel.hidden = i !== index;
-    });
-    tabs.forEach((tab, i) => {
-      tab.setAttribute('aria-selected', String(i === index));
-      tab.tabIndex = i === index ? 0 : -1;
-    });
+    panels.forEach((panel, i) => { panel.classList.toggle('is-active', i === index); panel.hidden = i !== index; });
+    tabs.forEach((tab, i) => { tab.setAttribute('aria-selected', String(i === index)); tab.tabIndex = i === index ? 0 : -1; });
     select.value = panels[index].id;
     previous.disabled = index === 0; next.disabled = index === panels.length - 1;
     document.querySelector('.pagination-count').textContent = String(index + 1).padStart(2, '0') + ' / 08';
     document.title = panels[index].querySelector('h2').textContent + ' · LiDAR 评测｜Sensor Atlas';
     if (updateUrl) history.replaceState(null, '', '#' + panels[index].id);
-    if (focus) { panels[index].focus({ preventScroll: true }); panels[index].scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' }); }
-    sceneFor(panels[index].querySelector('canvas')).draw();
+    if (focus) {
+      panels[index].focus({ preventScroll: true });
+      panels[index].scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+    }
+    sceneFor(panels[index].querySelector('canvas[data-scene]')).draw();
   }
-  document.body.classList.add('js-ready');
   activate(location.hash.slice(1), false);
   for (const [index, tab] of tabs.entries()) {
     tab.addEventListener('click', (event) => { event.preventDefault(); activate(tab.dataset.topic); });
@@ -93,6 +118,12 @@ if (tabs.length) {
   window.addEventListener('hashchange', () => activate(location.hash.slice(1), false));
 }
 
+document.body.classList.add('js-ready');
+// Reposition a deep link after progressive enhancement hides the other topics.
+const initialTopic = document.querySelector('.topic-panel.is-active');
+if (initialTopic && location.hash === '#' + initialTopic.id) {
+  requestAnimationFrame(() => initialTopic.scrollIntoView({ behavior: 'instant', block: 'start' }));
+}
 document.addEventListener('visibilitychange', () => scenes.forEach((scene) => { scene.lastFrame = performance.now(); }));
 function tick(now) {
   if (!document.hidden) scenes.forEach((scene) => scene.tick(now));

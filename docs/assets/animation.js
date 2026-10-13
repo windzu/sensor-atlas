@@ -1,325 +1,371 @@
-// All scenes are qualitative illustrations, not calibrated sensor simulations.
-const C = { ink: '#173b3c', teal: '#147b7d', tealLight: '#75a5a0', orange: '#cb6536', muted: '#657676', line: '#b9cabc', pale: '#dbe5d6', lime: '#dfeaab' };
-const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
-const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
-const noise = (n) => (hash(n) + hash(n + 1000) + hash(n + 2000) + hash(n + 3000) - 2);
+// Deterministic, qualitative geometry. This is not a calibrated LiDAR simulator.
+const C = { bg: '#0d1b22', panel: '#10232c', grid: '#25404b', text: '#e0ecee', muted: '#829ba5', cyan: '#6fe1ca', amber: '#f3af70', surface: '#7396a3' };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const hash = (n) => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
+const lerp = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+const noise = (n) => hash(n) + hash(n + 701) + hash(n + 1403) - 1.5;
+const NAMES = { range: ['正面目标', '目标轮廓'], precision: ['平整墙面与墙角', '法向离散 / 通道分层'], ghost: ['真实反光牌', '轮廓膨胀 / 异位鬼影'], tail: ['前景边缘与背景墙', '空隙中的桥接点'], glass: ['玻璃与后方目标', '玻璃缺点 / 后方可见'], wet: ['湿区与周边目标', '地面缺点 / 地下伪点'], fog: ['水雾与固定目标', '空气回波 / 目标衰减'], dirt: ['污染窗口与目标墙', '局部缺点 / 近场噪点'] };
+
+class Geometry {
+  constructor() { this.surfaces = []; this.points = []; this.labels = []; this.rays = []; this.sensor = [0, -3.05, 1.02]; }
+  point(p, color = C.cyan, opacity = .8, tag = '') { this.points.push({ p, color, opacity, tag }); }
+  plane(corners, color = C.surface, spacing = .16, sample = true, tag = '') {
+    this.surfaces.push({ corners, color });
+    if (!sample) return;
+    const distance = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]));
+    const u = Math.max(1, Math.ceil(distance(corners[0], corners[1]) / spacing));
+    const v = Math.max(1, Math.ceil(distance(corners[0], corners[3]) / spacing));
+    for (let j = 0; j <= v; j++) for (let i = 0; i <= u; i++) {
+      this.point(lerp(lerp(corners[0], corners[1], i / u), lerp(corners[3], corners[2], i / u), j / v), C.cyan, .78, tag);
+    }
+  }
+  box(center, size, color = C.surface, spacing = .16, sample = true, tag = '') {
+    const [x, y, z] = center, [w, d, h] = size;
+    const a = [x-w/2,y-d/2,z-h/2], b = [x+w/2,y-d/2,z-h/2], c = [x+w/2,y+d/2,z-h/2], e = [x-w/2,y+d/2,z-h/2];
+    const top = (p) => [p[0], p[1], p[2]+h];
+    this.plane([a,b,top(b),top(a)],color,spacing,sample,tag);
+    this.plane([b,c,top(c),top(b)],color,spacing,sample,tag);
+    this.plane([e,a,top(a),top(e)],color,spacing,sample,tag);
+    this.plane([top(a),top(b),top(c),top(e)],color,spacing,sample,tag);
+  }
+  cylinder(center, radius, height, color = C.surface, spacing = .12, sample = true, tag = '', topRadius = radius) {
+    const n = 24, rows = Math.max(1, Math.ceil(height / spacing));
+    const p = (a, z) => [center[0]+Math.cos(a)*(radius+(topRadius-radius)*z/height),center[1]+Math.sin(a)*(radius+(topRadius-radius)*z/height),center[2]+z];
+    for (let i = 0; i < n; i++) {
+      const a = i/n*Math.PI*2, b = (i+1)/n*Math.PI*2;
+      this.surfaces.push({ corners:[p(a,0),p(b,0),p(b,height),p(a,height)], color });
+    }
+    if (sample) for (let j = 0; j <= rows; j++) {
+      const z = j/rows*height, r = radius+(topRadius-radius)*j/rows;
+      const count = Math.max(4, Math.ceil(Math.PI*2*Math.max(r,.02)/spacing));
+      for (let i=0;i<count;i++) this.point(p(i/count*Math.PI*2,z),C.cyan,.85,tag);
+    }
+  }
+  sphere(center, radius, spacing = .1, tag = 'target') {
+    const p = (lat, lon) => [center[0]+radius*Math.cos(lat)*Math.cos(lon),center[1]+radius*Math.cos(lat)*Math.sin(lon),center[2]+radius*Math.sin(lat)];
+    for(let j=0;j<10;j++) for(let i=0;i<16;i++) {
+      const a=-Math.PI/2+j*Math.PI/10,b=a+Math.PI/10,u=i*Math.PI/8,v=u+Math.PI/8;
+      this.surfaces.push({corners:[p(a,u),p(a,v),p(b,v),p(b,u)],color:'#9dbbc2'});
+    }
+    const rows=Math.max(3,Math.ceil(radius*Math.PI/spacing));
+    for(let j=0;j<=rows;j++) {
+      const lat=-Math.PI/2+j*Math.PI/rows,cols=Math.max(4,Math.ceil(Math.PI*2*radius*Math.cos(lat)/spacing));
+      for(let i=0;i<cols;i++) this.point(p(lat,i/cols*Math.PI*2),C.cyan,.88,tag);
+    }
+  }
+  target(kind, x, y, spacing = .1) {
+    if (kind === 'car') {
+      this.box([x,y,.52],[1.8,.85,.75],'#6b8796',spacing,true,'target');
+      this.box([x,y+.06,1.08],[1.35,.65,.55],'#8ab5bf',spacing,true,'target');
+      for (const s of [-1,1]) this.box([x+s*.73,y,.2],[.22,.95,.3],'#3f5664',spacing,true,'target');
+    } else if (kind === 'cone') {
+      this.box([x,y,.035],[.65,.65,.07],'#b78666',spacing,true,'target');
+      this.cylinder([x,y,.07],.25,.72,'#a98870',spacing,true,'target',.035);
+      this.cylinder([x,y,.4],.145,.13,'#c9d9d8',spacing,false,'target',.105);
+    } else {
+      const seated = kind === 'rider', lower = seated ? .4 : 0;
+      this.sphere([x,y,1.57+lower*.2],.145,spacing);
+      this.cylinder([x,y,.66+lower*.4],.18,.66,'#698f9b',spacing,true,'target',.225);
+      for (const s of [-1,1]) {
+        this.cylinder([x+s*.105,y,lower*.6],.075,.68-lower*.2,'#718e98',spacing,true,'target');
+        this.cylinder([x+s*.28,y,.68+lower*.4],.055,.55,'#8ba8ae',spacing,true,'target');
+      }
+      if (seated) {
+        this.box([x,y-.15,.66],[.08,.65,.55],'#7e9d9f',spacing,true,'target');
+        this.box([x,y-.4,1.02],[.95,.07,.07],'#a3babc',spacing,true,'target');
+        for (let i=0;i<60;i++) {
+          const a=i/60*Math.PI*2;
+          this.point([x+Math.cos(a)*.035,y-.48+Math.cos(a)*.36,.38+Math.sin(a)*.36],C.cyan,.9,'target');
+        }
+      }
+    }
+  }
+  floor() {
+    for(let x=-3.2;x<=3.2;x+=.24) for(let y=-2.4;y<=3.3;y+=.24) this.point([x,y,0],C.cyan,.24,'ground');
+  }
+}
 
 export class AtlasScene {
   constructor(canvas) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
-    this.kind = canvas.dataset.scene;
-    this.width = 900;
-    this.height = this.kind === 'hero' ? 540 : 440;
-    this.value = this.kind === 'hero' ? 50 : Number(canvas.closest('article')?.querySelector('input[type=range]')?.value || 60);
-    this.targetKind = 'person';
-    this.hitContext = document.createElement('canvas').getContext('2d');
-    this.paused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.visible = false;
-    this.time = 0;
-    this.mobile = false;
-    this.lastFrame = performance.now();
-    this.resizeObserver = new ResizeObserver(() => this.draw());
-    this.resizeObserver.observe(canvas);
+    this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.kind = canvas.dataset.scene;
+    this.value = Number(canvas.closest('article')?.querySelector('input[type=range]')?.value || 35);
+    this.targetKind = 'person'; this.mode = 'compare'; this.view = 'orbit'; this.baseline = false;
+    this.yaw = -.48; this.pitch = .48; this.time = 0; this.lastFrame = performance.now(); this.lastDraw = 0;
+    this.motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    this.paused = this.motionPreference.matches; this.visible = false; this.phase = 0;
+    if(this.paused) { this.time=8.999; this.phase=2; }
+    this.motionPreference.addEventListener('change', (event) => {
+      if (event.matches) this.setPhase(2);
+    });
+    this.resizeObserver = new ResizeObserver(() => this.draw()); this.resizeObserver.observe(canvas);
     this.intersectionObserver = new IntersectionObserver(([entry]) => {
       this.visible = entry.isIntersecting;
-      if (this.visible) this.draw();
-    }, { rootMargin: '80px' });
-    this.intersectionObserver.observe(canvas);
+      if(this.visible) { this.lastFrame = performance.now(); this.draw(); }
+    }); this.intersectionObserver.observe(canvas);
+    if(this.kind !== 'hero') this.bindCamera();
+    this.rebuild();
   }
-  update(value) { this.value = Number(value); this.draw(); }
+  bindCamera() {
+    let drag = null;
+    this.canvas.addEventListener('pointerdown',(event) => {
+      // Preserve vertical scrolling on touchscreens; camera presets remain available.
+      if(event.pointerType === 'touch') return;
+      drag = [event.clientX,event.clientY]; this.canvas.setPointerCapture(event.pointerId);
+    });
+    this.canvas.addEventListener('pointermove',(event) => {
+      if(!drag) return;
+      this.yaw += (event.clientX-drag[0])*.008;
+      this.pitch = clamp(this.pitch+(event.clientY-drag[1])*.005,.08,1.48);
+      this.view = 'custom'; drag = [event.clientX,event.clientY]; this.onView?.('custom'); this.draw();
+    });
+    for(const name of ['pointerup','pointercancel','lostpointercapture']) this.canvas.addEventListener(name,() => { drag = null; });
+    this.canvas.addEventListener('keydown',(event) => {
+      if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)) return;
+      event.preventDefault(); this.view = 'custom';
+      this.yaw += event.key === 'ArrowLeft' ? -.08 : event.key === 'ArrowRight' ? .08 : 0;
+      this.pitch = clamp(this.pitch+(event.key === 'ArrowUp' ? .06 : event.key === 'ArrowDown' ? -.06 : 0),.08,1.48);
+      this.onView?.('custom'); this.draw();
+    });
+  }
+  setView(view) {
+    this.view=view;
+    [this.yaw,this.pitch] = view === 'top' ? [0,1.48] : view === 'front' ? [0,.08] : view === 'side' ? [Math.PI/2,.12] : [-.48,.48];
+    this.draw();
+  }
+  update(value) { this.value=Number(value); this.rebuild(); this.draw(); }
+  setBaseline(active) { this.baseline=active; this.rebuild(); this.draw(); }
+  setPhase(phase) { this.time=phase===2?8.999:phase*3+1.3; this.phase=phase; this.paused=true; this.onPhase?.(phase); this.onPause?.(); this.draw(); }
+  reset() { this.time=this.paused?8.999:0; this.phase=this.paused?2:0; this.mode='compare'; this.baseline=false; this.targetKind='person'; this.setView('orbit'); this.rebuild(); this.draw(); }
   tick(now) {
-    const delta = Math.min((now - this.lastFrame) / 1000, .05);
-    this.lastFrame = now;
-    if (!this.paused && this.visible) { this.time += delta; this.draw(); }
+    const dt=Math.min((now-this.lastFrame)/1000,.05); this.lastFrame=now;
+    if(!this.visible || this.canvas.closest('[hidden]') || this.paused) return;
+    this.time+=dt;
+    const phase=Math.floor((this.time%9)/3);
+    if(phase!==this.phase) { this.phase=phase; this.onPhase?.(phase); }
+    if(now-this.lastDraw>=1000/30) { this.draw(); this.lastDraw=now; }
+  }
+  rebuild() {
+    const g = new Geometry();
+    const value=this.baseline ? (this.kind==='range'?5:this.kind==='precision'?10:0) : this.value;
+    const a=value/100;
+    if(this.kind==='hero') {
+      g.box([-2.3,1.2,1.15],[1.35,1.3,2.3],'#698e9b',.14);
+      g.target('car',1.4,1.8,.14); g.target('cone',-.4,.4,.09); g.target('person',2.6,-.6,.09); g.floor();
+      g.rays=[[-2.3,.55,1.8],[1.4,1.35,1],[2.6,-.72,1.1],[-.4,.3,.5]];
+    } else if(this.kind==='range') {
+      g.target(this.targetKind,0,1.5,.055+value*.005); g.floor();
+      g.rays=[[0,1.2,1.5],[-.2,1.2,.8],[.17,1.2,.25]];
+      g.labels.push({p:[0,1.5,2],text:{person:'人 · 正面',car:'车 · 正面',rider:'骑行者 · 正面',cone:'锥桶 · 正面'}[this.targetKind]});
+    } else if(this.kind==='precision') {
+      g.plane([[-2,2,0],[2,2,0],[2,2,2.5],[-2,2,2.5]],'#779da8',.13,true,'wall');
+      g.plane([[2,2,0],[2,.4,0],[2,.4,2.5],[2,2,2.5]],'#628d9b',.13,true,'corner');
+      g.points.forEach((p,i) => { if(p.tag==='wall') p.p[1]+=noise(i)*(.025+value*.003)+(i%4===0 ? value*.002 : 0); else p.p[0]+=noise(i)*(.025+value*.003); });
+      g.floor(); g.rays=[[-1,2,1.7],[0,2,1],[1,2,.4]];
+      g.labels.push({p:[-1.1,2,2.55],text:'平面法向厚度'});
+    } else if(this.kind==='ghost') {
+      g.box([-.5,1.5,1.7],[1.55,.07,.9],'#adab88',.1,true,'sign');
+      g.box([-.5,1.5,.65],[.09,.09,1.3],'#647f8a',.13); g.floor();
+      for(let i=0;i<a*230;i++) {
+        const x=-.5+(hash(i)-.5)*2.25, z=1.7+(hash(i+80)-.5)*1.4;
+        if(Math.abs(x+.5)>.78 || Math.abs(z-1.7)>.45) g.point([x,1.48+noise(i)*.08,z],C.amber,.86,'anomaly');
+        g.point([1.35+hash(i+70)*1.25,2.1+noise(i+21)*.16,.3+hash(i+400)*.85],C.amber,.82,'anomaly');
+      }
+      g.rays=[[-.5,1.46,1.7]]; g.labels.push({p:[-.5,1.5,2.3],text:'强反物'});
+      if(a>.01) g.labels.push({p:[2,2.1,1.35],text:'异位鬼影',cloudOnly:true,color:C.amber});
+    } else if(this.kind==='tail') {
+      g.box([-.6,-.1,1],[.16,.18,2],'#809ca6',.08);
+      g.plane([[-2,2.5,0],[2,2.5,0],[2,2.5,2.5],[-2,2.5,2.5]],'#628996',.16); g.floor();
+      const edge=[-.51,-.18,1.04], far=[-.04,2.5,1.05];
+      for(let i=0;i<a*170;i++) {
+        const p=lerp(edge,far,.06+hash(i)*.88); p[0]+=noise(i+6)*.07; p[2]+=noise(i+66)*.13;
+        g.point(p,C.amber,.86,'anomaly');
+      }
+      g.rays=[edge,far]; g.labels.push({p:[-.6,-.1,2.15],text:'前景边缘'},{p:[1.2,2.5,2.55],text:'背景'});
+      if(a>.01) g.labels.push({p:[-.25,1.2,1.35],text:'桥接点',cloudOnly:true,color:C.amber});
+    } else if(this.kind==='glass') {
+      const rotation=value*Math.PI/180, point=(x,z)=>[x*Math.cos(rotation),.35+x*Math.sin(rotation),z];
+      g.plane([point(-1.45,0),point(1.45,0),point(1.45,2.5),point(-1.45,2.5)],'#70b7c1',.25,false);
+      for(const x of [-1.45,1.45]) g.box(point(x,1.25),[.055,.055,2.5],'#9eb2b9',.16);
+      for(let i=0;i<25;i++) if(hash(i)>.35+value/110) g.point(point((hash(i+3)-.5)*2.8,hash(i+21)*2.5),C.cyan,.7,'glass');
+      g.target('cone',.55,2.3,.12); g.floor();
+      if(value>10) {
+        const clone=g.points.filter((p)=>p.tag==='target');
+        clone.forEach((p,i)=>{ if(hash(i+770)<value/100) g.point([p.p[0]-1.9,p.p[1]+.3,p.p[2]],C.amber,.74,'anomaly'); });
+        g.labels.push({p:[-1.4,2.6,1.25],text:'可能的虚影',cloudOnly:true,color:C.amber});
+      }
+      g.rays=[[.55,2.05,.6]]; g.reflection=[[0,.35,1],[-2,-.75,1.5]];
+      g.labels.push({p:point(-.7,2.6),text:'玻璃'},{p:[.8,2.3,1.35],text:'后方目标'});
+    } else if(this.kind==='wet') {
+      g.floor(); g.target('cone',1.7,2.1,.1);
+      g.plane([[-1.5,-.1,.015],[1.4,-.1,.015],[1.4,2.3,.015],[-1.5,2.3,.015]],a>.01?'#497f96':'#465c67',.2,false);
+      g.points=g.points.filter((p,i)=>!(p.tag==='ground'&&p.p[0]>-1.5&&p.p[0]<1.4&&p.p[1]>-.1&&p.p[1]<2.3&&hash(i)<a*.9));
+      const clone=g.points.filter((p)=>p.tag==='target');
+      clone.forEach((p,i)=>{ if(hash(i+79)<a*.8) g.point([p.p[0],p.p[1],-p.p[2]-.05],C.amber,.75,'anomaly'); });
+      g.rays=[[-.2,.5,0]]; g.reflection=[[-.2,.5,0],[1.7,2.1,.6]];
+      g.labels.push({p:[-.65,.6,.12],text:a>.01?'湿区 / 积水':'干燥地面'});
+      if(a>.01) g.labels.push({p:[1.7,2.1,-1],text:'地面下方伪点',cloudOnly:true,color:C.amber});
+    } else if(this.kind==='fog') {
+      g.target('car',.5,2.2,.14); g.floor();
+      g.points=g.points.filter((p,i)=>p.tag!=='target'||hash(i+231)>a*.73);
+      for(let i=0;i<a*310;i++) g.point([(hash(i)-.5)*4,-1.6+hash(i+330)*3.3,.25+hash(i+70)*2.2],C.amber,.4+hash(i+180)*.45,'fog');
+      g.rays=[[.5,1.75,1],[.5,1.75,.5]]; g.labels.push({p:[.5,2.2,1.8],text:'后方固定目标'});
+    } else if(this.kind==='dirt') {
+      g.plane([[-2.6,2,0],[2.6,2,0],[2.6,2,2.4],[-2.6,2,2.4]],'#6f94a2',.13,true,'wall'); g.floor();
+      g.points=g.points.filter((p,i)=>!(p.tag==='wall'&&p.p[0]>-.6&&p.p[0]<1.6&&hash(i+290)<a*.96));
+      for(let i=0;i<a*105;i++) g.point([-.25+hash(i)*.7,-2.5+hash(i+41)*.8,.7+hash(i+720)*.7],C.amber,.83,'anomaly');
+      g.rays=[[-1.8,2,1.2],[.5,2,1.2],[2,2,1.2]];
+      g.labels.push({p:[.5,2,2.55],text:a>.01?'污染方向对应缺点':'完整目标表面',cloudOnly:true,color:a>.01?C.amber:C.text});
+    }
+    this.model=g;
+  }
+  project(p, box) {
+    const [x,y,z]=p, co=Math.cos(this.yaw), si=Math.sin(this.yaw);
+    const side=x*co-y*si, depth=x*si+y*co;
+    const scale=Math.min(box.w/7.7,box.h/4.75);
+    return {x:box.x+box.w*.5+side*scale,y:box.y+box.h*.61-depth*Math.sin(this.pitch)*scale-(z-.5)*Math.cos(this.pitch)*scale,depth:depth*Math.cos(this.pitch)+(z-.5)*Math.sin(this.pitch)};
+  }
+  line(a,b,color,width=1,alpha=1,dashed=false) {
+    const c=this.ctx; c.globalAlpha=alpha; c.strokeStyle=color; c.lineWidth=width; c.setLineDash(dashed?[5,6]:[]);
+    c.beginPath(); c.moveTo(a.x,a.y); c.lineTo(b.x,b.y); c.stroke(); c.setLineDash([]); c.globalAlpha=1;
+  }
+  text(text,x,y,size=17,color=C.muted,align='left') {
+    const c=this.ctx; c.font=`${size}px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif`; c.fillStyle=color; c.textAlign=align; c.globalAlpha=1; c.fillText(text,x,y);
+  }
+  paintSurface(surface,box,alpha=.2) {
+    const c=this.ctx, points=surface.corners.map(p=>this.project(p,box));
+    c.beginPath(); points.forEach((p,i)=>i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y)); c.closePath();
+    c.fillStyle=surface.color; c.globalAlpha=alpha; c.fill(); c.strokeStyle=surface.color; c.lineWidth=1.15; c.globalAlpha=.58; c.stroke(); c.globalAlpha=1;
+  }
+  paintGrid(box) {
+    for(let n=-4;n<=4;n++) {
+      this.line(this.project([n,-3.8,0],box),this.project([n,4,0],box),C.grid,1,.7);
+      this.line(this.project([-4,n,0],box),this.project([4,n,0],box),C.grid,1,.7);
+    }
+    const center=this.project([0,0,0],box);
+    this.line(center,this.project([1.4,0,0],box),'#6d8a94',1.2,.7);
+    this.line(center,this.project([0,1.4,0],box),'#6d8a94',1.2,.7);
+    this.line(center,this.project([0,0,1.4],box),'#6d8a94',1.2,.7);
+  }
+  paintSensor(box) {
+    const g=new Geometry(); g.box([0,-3.05,.78],[.45,.4,.42],'#c7d6d9',.1,false);
+    for(const s of g.surfaces) this.paintSurface(s,box,.6);
+    const p=this.project(this.model.sensor,box),c=this.ctx;
+    c.fillStyle=C.cyan; c.beginPath(); c.ellipse(p.x,p.y,10,3,0,0,Math.PI*2); c.fill();
+    this.text('LiDAR',p.x,p.y+33,this.mobile?25:16,C.muted,'center');
+  }
+  paintBeam(box) {
+    const cycle=(this.time%9)/3, phase=Math.floor(cycle), progress=cycle-phase;
+    const start=this.project(this.model.sensor,box), c=this.ctx;
+    const rays=this.model.rays;
+    rays.forEach((p,i)=>{
+      const end=this.project(p,box);
+      const faded=this.kind==='dirt'&&i===1&&!this.baseline?1-this.value/110:1;
+      this.line(start,end,C.amber,1,.18*faded);
+      if(phase<2) {
+        const t=(progress+i*.14)%1, ratio=phase===0?t:1-t;
+        const head={x:start.x+(end.x-start.x)*ratio,y:start.y+(end.y-start.y)*ratio};
+        const tail=phase===0?Math.max(0,ratio-.12):Math.min(1,ratio+.12);
+        this.line({x:start.x+(end.x-start.x)*tail,y:start.y+(end.y-start.y)*tail},head,phase===0?C.amber:C.cyan,2.6,.9*faded);
+        c.fillStyle=phase===0?C.amber:C.cyan; c.beginPath(); c.arc(head.x,head.y,3,0,Math.PI*2); c.fill();
+      }
+    });
+    if(this.model.reflection && !this.baseline) this.line(...this.model.reflection.map(p=>this.project(p,box)),C.amber,1.5,.65,true);
+    if(phase===2) {
+      c.strokeStyle=C.cyan; c.globalAlpha=.5*(1-progress); c.lineWidth=1;
+      c.beginPath(); c.ellipse(start.x,start.y,8+progress*26,3+progress*9,0,0,Math.PI*2); c.stroke(); c.globalAlpha=1;
+    }
+  }
+  paintPoints(box,isScene=false) {
+    const c=this.ctx, phase=Math.floor((this.time%9)/3), sweep=(this.time%3)/3;
+    const points=this.model.points.map((point,i)=>({...point,i,screen:this.project(point.p,box)})).sort((a,b)=>b.screen.depth-a.screen.depth);
+    for(const point of points) {
+      if(isScene && point.tag!=='fog') continue;
+      const {x,y}=point.screen;
+      const band=Math.abs((x-box.x)/box.w-sweep)<.06;
+      const revealed=(x-box.x)/box.w<=sweep;
+      c.globalAlpha=point.opacity*(isScene?.45:phase===2?(revealed?.95:.18):phase===1?.57:.42);
+      c.fillStyle=point.color;
+      const radius=point.tag==='ground'?1.45:point.tag==='fog'?1.8:band&&!isScene?2.65:1.85;
+      c.beginPath(); c.arc(x,y,radius,0,Math.PI*2); c.fill();
+      if(band&&phase===2&&!isScene&&point.tag!=='ground') {
+        c.globalAlpha=.075; c.beginPath(); c.arc(x,y,6,0,Math.PI*2); c.fill();
+      }
+    }
+    c.globalAlpha=1;
+  }
+  paintLabels(box,isScene) {
+    const occupied=[];
+    for(const label of this.model.labels) {
+      if(isScene&&label.cloudOnly) continue;
+      const p=this.project(label.p,box);
+      const size=this.mobile?26:16;
+      const c=this.ctx; c.font=`${size}px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif`;
+      const width=c.measureText(label.text).width+14;
+      const x=clamp(p.x,box.x+width/2+12,box.x+box.w-width/2-12);
+      let y=clamp(p.y-17,box.y+55,box.y+box.h-45);
+      for(let i=0;i<5&&occupied.some(r=>Math.abs(r.x-x)<(r.width+width)/2&&Math.abs(r.y-y)<size+9);i++) y=clamp(y-size-12,box.y+55,box.y+box.h-45);
+      occupied.push({x,y,width});
+      if(Math.abs(y-(p.y-17))>8) this.line(p,{x,y:y+9},label.color||C.surface,1,.5);
+      c.fillStyle=C.bg; c.globalAlpha=.86; c.fillRect(x-width/2,y-size,width,size+8);c.globalAlpha=1;
+      this.text(label.text,x,y,size,label.color||C.text,'center');
+    }
+    if(isScene&&this.kind==='dirt') {
+      const p=this.project(this.model.sensor,box);
+      this.text(this.baseline?'清洁窗口':'污染窗口',p.x-30,p.y-38,this.mobile?26:16,this.baseline?C.cyan:C.amber,'right');
+      if(!this.baseline) {
+        const c=this.ctx; c.fillStyle='#c39570';
+        for(let i=0;i<this.value/10;i++) { c.beginPath();c.arc(p.x-7+hash(i)*14,p.y-3+hash(i+24)*6,2.2,0,Math.PI*2);c.fill(); }
+      }
+    }
+    if(isScene&&this.kind==='fog'&&!this.baseline) this.text('空气中的水滴',box.x+box.w*.38,box.y+box.h*.45,this.mobile?26:16,C.amber,'center');
+  }
+  paintPanel(box,isScene,hero=false) {
+    const c=this.ctx; c.save(); c.beginPath(); c.rect(box.x,box.y,box.w,box.h); c.clip();
+    this.paintGrid(box);
+    if(isScene) {
+      this.model.surfaces.map(s=>({s,depth:this.project(s.corners.reduce((sum,p)=>sum.map((v,i)=>v+p[i]/4),[0,0,0]),box).depth})).sort((a,b)=>b.depth-a.depth).forEach(({s})=>this.paintSurface(s,box,this.kind==='glass'?.16:.48));
+      this.paintPoints(box,true); this.paintBeam(box);
+    } else this.paintPoints(box);
+    this.paintSensor(box); this.paintLabels(box,isScene);
+    if(!hero) {
+      this.text(isScene?'A / 真实场景':'B / 点云结果',box.x+18,box.y+26,this.mobile?28:19,C.text);
+      const descriptions=NAMES[this.kind]||['场景几何','表面点云'];
+      this.text(descriptions[isScene?0:1],box.x+18,box.y+box.h-15,this.mobile?24:15,C.muted);
+    }
+    c.restore();
   }
   draw() {
-    const rect = this.canvas.getBoundingClientRect();
-    if (!rect.width || !rect.height || !this.ctx) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.round(rect.width * dpr), h = Math.round(rect.height * dpr);
-    if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
-    this.ctx.setTransform(w / this.width, 0, 0, h / this.height, 0, 0);
-    this.ctx.clearRect(0, 0, this.width, this.height);
-    this.mobile = rect.width < 430;
-    this.grid();
-    const render = this[this.kind];
-    if (typeof render === 'function') render.call(this, this.time);
-  }
-  grid() {
-    const x = this.ctx;
-    x.fillStyle = '#bfd0bc';
-    x.globalAlpha = .65;
-    for (let i = 24; i < this.width; i += 34) for (let j = 24; j < this.height; j += 34) {
-      x.beginPath(); x.arc(i, j, .85, 0, Math.PI * 2); x.fill();
+    const rect=this.canvas.getBoundingClientRect(); if(!rect.width||!this.ctx) return;
+    this.mobile=rect.width<560; const hero=this.kind==='hero';
+    this.width=1000; this.height=hero?650:this.mobile&&this.mode==='compare'?850:500;
+    this.canvas.style.aspectRatio=`${this.width} / ${this.height}`;
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    const w=Math.round(rect.width*dpr),h=Math.round(rect.width*this.height/this.width*dpr);
+    if(this.canvas.width!==w||this.canvas.height!==h) { this.canvas.width=w;this.canvas.height=h; }
+    const c=this.ctx; c.setTransform(w/this.width,0,0,h/this.height,0,0);
+    c.fillStyle=C.bg; c.fillRect(0,0,this.width,this.height);
+    const gradient=c.createRadialGradient(500,220,20,500,220,600); gradient.addColorStop(0,'#14313a');gradient.addColorStop(1,C.bg);c.fillStyle=gradient;c.fillRect(0,0,this.width,this.height);
+    if(hero) {
+      const box={x:25,y:30,w:950,h:575};
+      this.paintGrid(box);
+      this.model.surfaces.forEach(s=>this.paintSurface(s,box,.12));
+      this.paintPoints(box); this.paintBeam(box);this.paintSensor(box);
+      this.text('SURFACE → RETURN → GEOMETRY',32,33,17,C.muted);
+      this.text('三维点云 · 定性演示',960,615,19,C.cyan,'right');
+      return;
     }
-    x.globalAlpha = 1;
-  }
-  line(x1, y1, x2, y2, color = C.line, width = 2, dashed = false, alpha = 1) {
-    const c = this.ctx; c.save(); c.globalAlpha = alpha; c.strokeStyle = color; c.lineWidth = width;
-    if (dashed) c.setLineDash([7, 7]);
-    c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); c.restore();
-  }
-  poly(points, stroke = C.line, fill = null, width = 2, alpha = 1) {
-    const c = this.ctx; c.save(); c.globalAlpha = alpha; c.beginPath();
-    points.forEach((p, i) => i ? c.lineTo(...p) : c.moveTo(...p)); c.closePath();
-    if (fill) { c.fillStyle = fill; c.fill(); }
-    if (stroke) { c.strokeStyle = stroke; c.lineWidth = width; c.stroke(); }
-    c.restore();
-  }
-  dot(x, y, size = 2.5, color = C.teal, alpha = 1) {
-    const c = this.ctx; c.save(); c.globalAlpha = alpha; c.fillStyle = color; c.beginPath(); c.arc(x, y, size, 0, Math.PI * 2); c.fill(); c.restore();
-  }
-  label(text, x, y, color = C.muted, align = 'left', size = 20) {
-    const c = this.ctx; c.save(); c.fillStyle = color; c.textAlign = align;
-    c.font = (this.mobile ? Math.max(size, 32) : size) + 'px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif';
-    c.fillText(text, x, y); c.restore();
-  }
-  sensor(x = 108, y = 225, label = true) {
-    const c = this.ctx; c.save();
-    c.fillStyle = C.ink; c.beginPath(); c.roundRect(x - 43, y - 31, 86, 58, 11); c.fill();
-    c.fillStyle = '#5e8e7e'; c.fillRect(x - 43, y - 13, 86, 11);
-    c.strokeStyle = '#dfeaab'; c.lineWidth = 1.5; c.beginPath(); c.ellipse(x, y - 25, 29, 5, 0, 0, Math.PI * 2); c.stroke();
-    this.dot(x + 32, y + 15, 3, C.lime);
-    this.line(x - 22, y + 29, x - 29, y + 53, C.ink, 2);
-    this.line(x + 22, y + 29, x + 29, y + 53, C.ink, 2);
-    if (label) this.label('LiDAR', x, y + 79, C.ink, 'center', 19);
-    c.restore();
-  }
-  beam(ax, ay, bx, by, t, color = C.orange, alpha = .6, offset = 0) {
-    this.line(ax, ay, bx, by, color, 1.5, false, alpha * .25);
-    const s = ((t * .45 + offset) % 1 + 1) % 1;
-    this.line(ax + (bx - ax) * Math.max(0, s - .09), ay + (by - ay) * Math.max(0, s - .09), ax + (bx - ax) * s, ay + (by - ay) * s, color, 2.7, false, alpha);
-    const r = ((t * .45 + offset + .48) % 1 + 1) % 1;
-    this.dot(bx + (ax - bx) * r, by + (ay - by) * r, 3, C.teal, alpha);
-  }
-  surfacePoints(x, y, w, h, spacing = 12, alpha = 1, seed = 0) {
-    for (let j = 0; j <= h; j += spacing) for (let i = 0; i <= w; i += spacing) {
-      this.dot(x + i + noise(i + j + seed) * .8, y + j, 2.2, C.teal, alpha);
-    }
-  }
-  targetPath(kind, cx, bottom, scale = 1) {
-    const p = new Path2D();
-    const X = (v) => cx + v * scale, Y = (v) => bottom + v * scale;
-    if (kind === 'person' || kind === 'rider') {
-      p.arc(X(0), Y(-169), 16 * scale, 0, Math.PI * 2);
-      p.rect(X(-24), Y(-143), 48 * scale, 70 * scale);
-      p.rect(X(-22), Y(-74), 17 * scale, 74 * scale);
-      p.rect(X(5), Y(-74), 17 * scale, 74 * scale);
-      p.rect(X(-39), Y(-137), 13 * scale, 69 * scale);
-      p.rect(X(26), Y(-137), 13 * scale, 69 * scale);
-      if (kind === 'rider') {
-        p.rect(X(-56), Y(-96), 112 * scale, 9 * scale);
-        p.ellipse(X(0), Y(-26), 9 * scale, 27 * scale, 0, 0, Math.PI * 2);
-        p.rect(X(-7), Y(-86), 14 * scale, 56 * scale);
-      }
-    } else if (kind === 'car') {
-      p.moveTo(X(-108), Y(-29)); p.lineTo(X(-97), Y(-94)); p.lineTo(X(-67), Y(-140)); p.lineTo(X(67), Y(-140));
-      p.lineTo(X(97), Y(-94)); p.lineTo(X(108), Y(-29)); p.closePath();
-      p.rect(X(-93), Y(-30), 30 * scale, 30 * scale); p.rect(X(63), Y(-30), 30 * scale, 30 * scale);
+    this.text(this.baseline?'REFERENCE / 基准条件':'EXPERIMENT / 当前条件',28,30,this.mobile?26:17,this.baseline?C.cyan:C.muted);
+    const display=this.baseline?(this.kind==='range'?'5 m':this.kind==='precision'?'10 m':'基准示意'):(this.kind==='range'||this.kind==='precision'?this.value+' m':this.kind==='glass'?this.value+'°':'条件示意');
+    this.text(display,972,30,this.mobile?26:17,C.text,'right');
+    if(this.mode==='cloud') this.paintPanel({x:20,y:47,w:960,h:430},false);
+    else if(this.mobile) {
+      this.paintPanel({x:20,y:52,w:960,h:376},true);
+      this.line({x:35,y:440},{x:965,y:440},C.grid,1);
+      this.paintPanel({x:20,y:452,w:960,h:376},false);
     } else {
-      p.moveTo(X(-9), Y(-122)); p.lineTo(X(9), Y(-122)); p.lineTo(X(47), Y(-14)); p.lineTo(X(-47), Y(-14)); p.closePath();
-      p.rect(X(-62), Y(-14), 124 * scale, 14 * scale);
+      this.paintPanel({x:20,y:52,w:470,h:424},true);
+      this.line({x:500,y:58},{x:500,y:465},C.grid,1);
+      this.paintPanel({x:510,y:52,w:470,h:424},false);
     }
-    return p;
-  }
-  target(kind, cx, bottom, scale = 1, spacing = 9, alpha = 1, color = C.teal, outline = true) {
-    const c = this.ctx, p = this.targetPath(kind, cx, bottom, scale);
-    if (outline) { c.save(); c.strokeStyle = C.line; c.lineWidth = 1.4; c.setLineDash([5, 6]); c.stroke(p); c.restore(); }
-    for (let y = bottom - 195 * scale; y <= bottom; y += spacing) for (let x = cx - 120 * scale; x <= cx + 120 * scale; x += spacing) {
-      if (this.hitContext.isPointInPath(p, x, y)) this.dot(x, y, spacing > 17 ? 3.2 : 2.4, color, alpha);
-    }
-  }
-  hero(t) {
-    const c = this.ctx;
-    const origin = [460, 455];
-    const left = [[80, 275], [135, 244], [270, 312], [215, 347]];
-    const right = [[645, 185], [800, 242], [800, 361], [645, 302]];
-    this.poly([[80, 275], [80, 150], [135, 119], [135, 244]], C.line, '#dae3d6');
-    this.poly([[135, 119], [270, 187], [270, 312], [135, 244]], C.line, '#eff4e9');
-    this.poly(left, C.line, '#e6ecde');
-    this.poly(right, C.line, '#e4ecde');
-    this.poly([[645, 185], [723, 143], [857, 197], [800, 242]], C.line, '#f9fbf2');
-    this.poly([[800, 242], [857, 197], [857, 316], [800, 361]], C.line, '#d5e1d0');
-    for (let row = 0; row < 10; row++) {
-      for (let col = 0; col < 14; col++) {
-        const u = col / 13, v = row / 9;
-        this.dot(135 + u * 135, 125 + u * 68 + v * 119, 2, C.teal, .72);
-        this.dot(650 + u * 147, 194 + u * 54 + v * 102, 2, C.teal, .8);
-      }
-    }
-    this.line(225, 412, 647, 236, C.line, 1.2, true);
-    this.line(690, 457, 337, 197, C.line, 1.2, true);
-    this.target('cone', 450, 320, .52, 6, .85);
-    const angle = Math.sin(t * .45) * .65 - 1.58;
-    const end = [origin[0] + Math.cos(angle) * 338, origin[1] + Math.sin(angle) * 338];
-    c.save(); c.fillStyle = '#cb653616'; c.beginPath(); c.moveTo(...origin); c.arc(...origin, 338, angle - .09, angle + .09); c.closePath(); c.fill(); c.restore();
-    this.beam(...origin, ...end, t, C.orange, .9);
-    for (let i = 0; i < 13; i++) {
-      const a = -2.4 + i * .13; this.dot(origin[0] + Math.cos(a) * 230, origin[1] + Math.sin(a) * 230, 2, C.teal, .6);
-    }
-    this.sensor(...origin, false);
-    this.label('表面 → 回波 → 点云', 450, 58, C.ink, 'center', 23);
-    this.label('扫描', 735, 445, C.orange, 'center', 19);
-    this.line(711, 433, end[0] + 15, end[1] + 9, C.orange, 1, true, .5);
-  }
-  range(t) {
-    const distance = this.value;
-    this.sensor(110, 235);
-    this.line(185, 337, 812, 337, C.line, 1.4);
-    for (let i = 0; i <= 6; i++) this.line(200 + i * 90, 337, 200 + i * 90, 344, C.line, 1.4);
-    const targetX = 572 + distance * 1.7;
-    const spacing = 5 + distance * .3;
-    this.target(this.targetKind, targetX, 320, this.targetKind === 'car' ? 1.12 : 1.17, spacing, .88);
-    this.beam(151, 232, targetX, 216, t);
-    this.beam(151, 232, targetX - 10, 293, t, C.orange, .6, .2);
-    this.label('距离示意 ' + distance + ' m', 455, 393, C.ink, 'center', 22);
-    const titles = { person: '人 · 正面', car: '车 · 正面', rider: '骑行者 · 正面', cone: '锥桶 · 正面' };
-    this.label(titles[this.targetKind], targetX, 60, C.ink, 'center', 21);
-    this.label('轮廓参考', targetX, 362, C.muted, 'center', 17);
-  }
-  precision(t) {
-    const c = this.ctx, spread = 1.7 + (this.value / 80) ** 2 * 16;
-    this.label('墙面 · 侧视', 270, 56, C.ink, 'center', 23);
-    this.label('墙角 · 俯视', 650, 56, C.ink, 'center', 23);
-    this.line(270, 90, 270, 338, C.line, 2);
-    this.line(652, 92, 652, 240, C.line, 2);
-    this.line(652, 240, 786, 240, C.line, 2);
-    for (let i = 0; i < 180; i++) {
-      const pulse = Math.sin(t * .8 + i * .01) * .25;
-      this.dot(270 + noise(i) * spread + pulse, 99 + hash(i + 5) * 228, 2.6);
-      this.dot(652 + noise(i + 600) * spread, 99 + hash(i + 60) * 140, 2.5);
-      this.dot(655 + hash(i + 18) * 127, 240 + noise(i + 200) * spread, 2.5);
-    }
-    const a = spread * 2.4;
-    this.line(270 - a, 362, 270 + a, 362, C.orange, 2);
-    this.line(270 - a, 354, 270 - a, 370, C.orange, 2);
-    this.line(270 + a, 354, 270 + a, 370, C.orange, 2);
-    this.label('厚度示意', 270, 402, C.orange, 'center', 20);
-    this.label('观察分层与粘连', 650, 333, C.muted, 'center', 20);
-    this.beam(444, 280, 280, 214, t, C.orange, .45);
-    c.save(); c.strokeStyle = C.line; c.lineWidth = 1; c.setLineDash([4, 6]); c.strokeRect(250 - a, 88, 40 + a * 2, 251); c.restore();
-  }
-  ghost(t) {
-    const amount = this.value / 100, c = this.ctx;
-    this.sensor(110, 238);
-    this.line(575, 210, 575, 337, C.line, 5);
-    c.fillStyle = '#f7f0d9'; c.fillRect(491, 115, 168, 95); c.strokeStyle = C.ink; c.lineWidth = 2; c.strokeRect(491, 115, 168, 95);
-    this.surfacePoints(499, 125, 145, 71, 10);
-    this.beam(152, 232, 568, 161, t, C.orange, .85);
-    this.label('真实反光牌', 575, 79, C.ink, 'center', 22);
-    for (let i = 0; i < amount * 80; i++) {
-      const a = hash(i + 30) * Math.PI * 2, r = 18 + hash(i + 75) * 22;
-      this.dot(575 + Math.cos(a) * (88 + r), 162 + Math.sin(a) * (45 + r), 2.6, C.orange, .5 + .35 * Math.sin(t + i) ** 2);
-    }
-    if (amount > .05) {
-      const fx = 707, fy = 303;
-      for (let i = 0; i < amount * 74; i++) this.dot(fx - 65 + hash(i) * 130, fy - 30 + hash(i + 300) * 60, 2.8, C.orange, .6);
-      this.line(642, 271, 773, 271, C.orange, 1.4, true);
-      this.line(642, 335, 773, 335, C.orange, 1.4, true);
-      this.label('错误位置的鬼影', 707, 378, C.orange, 'center', 20);
-      this.label('轮廓膨胀', 787, 156, C.orange, 'center', 18);
-    } else this.label('观察真实轮廓之外', 570, 381, C.muted, 'center', 21);
-  }
-  tail(t) {
-    const amount = this.value / 100;
-    this.sensor(110, 244);
-    this.poly([[422, 93], [442, 93], [442, 285], [422, 285]], C.line, '#d9e5d6');
-    this.surfacePoints(428, 101, 6, 171, 8);
-    this.line(754, 76, 754, 329, C.line, 3);
-    for (let j = 80; j < 328; j += 8) this.dot(752 + noise(j) * 2, j, 2.6);
-    this.poly([[151, 240], [749, 277], [749, 323]], null, '#cb653610');
-    this.beam(151, 240, 440, 283, t, C.orange, .85);
-    this.beam(151, 242, 752, 300, t, C.orange, .65, .12);
-    for (let i = 0; i < amount * 70; i++) {
-      const progress = .06 + hash(i + 7) * .88;
-      this.dot(442 + (752 - 442) * progress, 282 + progress * 18 + noise(i) * 10, 2.6, C.orange, .65);
-    }
-    this.label('近处物体边缘', 431, 55, C.ink, 'center', 20);
-    this.label('远处背景', 754, 55, C.ink, 'center', 20);
-    this.label(amount > .05 ? '本应为空 → 拉丝／粘连点' : '前后景之间本应为空', 590, 381, amount > .05 ? C.orange : C.muted, 'center', 21);
-  }
-  glass(t) {
-    const angle = this.value / 60, c = this.ctx;
-    this.sensor(110, 233);
-    this.poly([[470, 85], [506, 70], [506, 336], [470, 351]], '#74a6a0', '#77b7b516', 2);
-    this.target('cone', 733, 330, 1.04, 9, .8);
-    this.beam(151, 230, 732, 244, t, C.orange, .8);
-    for (let i = 0; i < 17 - angle * 11; i++) this.dot(472, 92 + hash(i + 80) * 244, 2.3, C.teal, .7);
-    const reflectionEnd = [355 - angle * 120, 78];
-    this.beam(484, 238, ...reflectionEnd, t, C.tealLight, .7, .2);
-    this.label('玻璃表面', 486, 43, C.ink, 'center', 21);
-    this.label('后方真实目标', 733, 86, C.ink, 'center', 21);
-    this.label('透射', 605, 215, C.muted, 'center', 19);
-    this.label('反射', 312, 151, C.muted, 'center', 19);
-    c.save(); c.globalAlpha = .12 + angle * .23; c.strokeStyle = C.orange; c.lineWidth = 1.7; c.setLineDash([5, 8]);
-    c.stroke(this.targetPath('cone', 785, 180, .42)); c.restore();
-    if (angle > .15) this.label('可能的虚影', 782, 190, C.orange, 'center', 18);
-    this.label('玻璃后的点 ≠ 玻璃本身可见', 478, 407, C.ink, 'center', 22);
-  }
-  wet(t) {
-    const amount = this.value / 100, ground = 267, c = this.ctx;
-    this.sensor(110, 174);
-    this.line(190, ground, 842, ground, C.line, 2);
-    c.fillStyle = '#92bab321'; c.beginPath(); c.ellipse(485, ground + 3, 153, 15, 0, 0, Math.PI * 2); c.fill();
-    for (let i = 0; i < 110; i++) {
-      const x = 191 + i * 5.8;
-      if (x > 333 && x < 639 && hash(i + 900) < amount * .87) continue;
-      this.dot(x, ground + noise(i) * 2, 2.5);
-    }
-    this.target('cone', 745, ground, .86, 9, .8);
-    this.beam(152, 170, 461, ground, t, C.orange, .85);
-    this.beam(461, ground, 734, 164, t, C.tealLight, .65, .2);
-    if (amount > .05) {
-      c.save(); c.translate(0, ground * 2); c.scale(1, -1);
-      this.target('cone', 745, ground, .8, 12, amount * .7, C.orange, false); c.restore();
-      this.label('可能的地面下方伪点', 660, 408, C.orange, 'center', 20);
-    }
-    this.label('真实地面', 299, 239, C.ink, 'center', 20);
-    this.label(amount > .05 ? '湿区／积水 → 地面缺点' : '干燥地面', 453, 321, amount > .05 ? C.orange : C.muted, 'center', 20);
-    this.label('真实目标', 745, 127, C.ink, 'center', 20);
-  }
-  fog(t) {
-    const amount = this.value / 100, c = this.ctx;
-    this.sensor(110, 235);
-    const gradient = c.createRadialGradient(461, 205, 30, 461, 205, 203);
-    gradient.addColorStop(0, 'rgba(183,201,190,' + (amount * .65) + ')'); gradient.addColorStop(1, 'rgba(183,201,190,0)');
-    c.fillStyle = gradient; c.fillRect(224, 48, 460, 311);
-    this.target('cone', 757, 320, 1.23, 8 + amount * 16, 1 - amount * .65);
-    this.beam(151, 231, 750, 245, t, C.orange, 1 - amount * .68);
-    for (let i = 0; i < amount * 75; i++) {
-      const px = 276 + hash(i + 3) * 330 + Math.sin(t * .45 + i) * 7;
-      const py = 85 + hash(i + 87) * 243;
-      this.dot(px, py, 2 + hash(i) * 2, i % 3 ? C.orange : C.tealLight, .4 + amount * .25);
-    }
-    this.label('雾滴散射', 457, 59, C.ink, 'center', 22);
-    this.label('后方目标', 756, 59, C.ink, 'center', 22);
-    this.label(amount > .05 ? '空气噪点增加' : '清晰光路', 460, 376, amount > .05 ? C.orange : C.muted, 'center', 21);
-    this.label(amount > .05 ? '目标回波变弱' : '完整目标轮廓', 745, 376, C.muted, 'center', 21);
-  }
-  dirt(t) {
-    const amount = this.value / 100, c = this.ctx;
-    this.sensor(135, 208);
-    c.save(); c.strokeStyle = C.line; c.lineWidth = 1.5; c.beginPath(); c.arc(144, 327, 58, 0, Math.PI * 2); c.stroke();
-    c.fillStyle = '#c8ddd3'; c.fillRect(152, 282, 7, 87);
-    for (let i = 0; i < amount * 17; i++) {
-      const y = 289 + hash(i + 4) * 70;
-      c.fillStyle = '#8c7257'; c.beginPath(); c.ellipse(154, y, 7 + hash(i) * 9, 4 + hash(i + 70) * 8, 0, 0, Math.PI * 2); c.fill();
-    }
-    c.restore();
-    this.line(175, 225, 174, 275, C.line, 1.4, true);
-    this.line(726, 65, 726, 324, C.line, 3);
-    for (let i = 0; i < 185; i++) {
-      const y = 72 + hash(i + 73) * 246;
-      if (y > 140 && y < 265 && hash(i + 38) < amount * .94) continue;
-      this.dot(723 + noise(i) * 3, y, 2.6);
-    }
-    this.beam(178, 202, 724, 102, t, C.orange, .75);
-    this.beam(178, 202, 724, 202, t, C.orange, 1 - amount * .92, .2);
-    this.beam(178, 202, 724, 305, t, C.orange, .6, .4);
-    for (let i = 0; i < amount * 25; i++) this.dot(199 + hash(i) * 78, 168 + hash(i + 5) * 71, 2.7, C.orange, .7);
-    this.label('窗口放大示意', 144, 415, C.ink, 'center', 20);
-    this.label('目标表面', 726, 39, C.ink, 'center', 22);
-    this.label(amount > .05 ? '污染方向对应缺点区' : '窗口清洁 → 回波恢复', 608, 382, amount > .05 ? C.orange : C.muted, 'center', 21);
   }
 }

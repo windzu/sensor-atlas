@@ -1,0 +1,321 @@
+{
+  "date": "2026-10-13",
+  "style": "The Aviator / cream, mint, coral / faceted 3D",
+  "scope": [
+    "home",
+    "all eight LiDAR topics",
+    "page typography, navigation and controls"
+  ],
+  "unitTests": 10,
+  "buildCheck": "passed",
+  "runtimeWarnings": 0,
+  "responsiveWidths": [
+    320,
+    390,
+    768,
+    1280
+  ],
+  "mobileQA": [
+    {
+      "id": "range",
+      "owner": "range",
+      "scrollWidth": 305,
+      "stageHeight": 395,
+      "width": 320
+    },
+    {
+      "id": "precision",
+      "owner": "precision",
+      "scrollWidth": 305,
+      "stageHeight": 395,
+      "width": 320
+    },
+    {
+      "id": "ghost",
+      "owner": "ghost",
+      "scrollWidth": 305,
+      "stageHeight": 395,
+      "width": 320
+    },
+    {
+      "id": "tail",
+      "owner": "tail",
+      "scrollWidth": 305,
+      "stageHeight": 395,
+      "width": 320
+    },
+    {
+      "id": "glass",
+      "owner": "glass",
+      "scrollWidth": 305,
+      "stageHeight": 395,
+      "width": 320
+    },
+    {
+      "id": "wet",
+      "owner": "wet",
+      "scrollWidth": 305,
+      "stageHeight": 395,
+      "width": 320
+    },
+    {
+      "id": "fog",
+      "owner": "fog",
+      "scrollWidth": 305,
+      "stageHeight": 395,
+      "width": 320
+    },
+    {
+      "id": "dirt",
+      "owner": "dirt",
+      "scrollWidth": 305,
+      "stageHeight": 395,
+      "width": 320
+    }
+  ],
+  "sceneControls": [
+    {
+      "topicId": "range",
+      "before": {
+        "anomaly": 0,
+        "original": "35",
+        "valid": 213
+      },
+      "maximum": {
+        "anomaly": 0,
+        "value": "80"
+      },
+      "baselineQA": {
+        "anomaly": 0,
+        "disabled": true,
+        "label": "基准条件 · 定性示意"
+      },
+      "modeQA": {
+        "cloud": true,
+        "rendererCount": 1,
+        "top": true
+      },
+      "resetQA": {
+        "baseline": "false",
+        "phase": "true",
+        "sharedCanvasOwner": "range",
+        "value": "35"
+      }
+    },
+    {
+      "topicId": "precision",
+      "before": {
+        "anomaly": 0,
+        "original": "40",
+        "valid": 784
+      },
+      "maximum": {
+        "anomaly": 0,
+        "value": "80"
+      },
+      "baselineQA": {
+        "anomaly": 0,
+        "disabled": true,
+        "label": "基准条件 · 定性示意"
+      },
+      "modeQA": {
+        "cloud": true,
+        "rendererCount": 1,
+        "top": true
+      },
+      "resetQA": {
+        "baseline": "false",
+        "phase": "true",
+        "sharedCanvasOwner": "precision",
+        "value": "40"
+      }
+    },
+    {
+      "topicId": "ghost",
+      "before": {
+        "anomaly": 165,
+        "original": "70",
+        "valid": 320
+      },
+      "maximum": {
+        "anomaly": 235,
+        "value": "100"
+      },
+      "baselineQA": {
+        "anomaly": 0,
+        "disabled": true,
+        "label": "基准条件 · 定性示意"
+      },
+      "modeQA": {
+        "cloud": true,
+        "rendererCount": 1,
+        "top": true
+      },
+      "resetQA": {
+        "baseline": "false",
+        "phase": "true",
+        "sharedCanvasOwner": "ghost",
+        "value": "70"
+      }
+    },
+    {
+      "topicId": "tail",
+      "before": {
+        "anomaly": 102,
+        "original": "70",
+        "valid": 620
+      },
+      "maximum": {
+        "anomaly": 145,
+        "value": "100"
+      },
+      "baselineQA": {
+        "anomaly": 0,
+        "disabled": true,
+        "label": "基准条件 · 定性示意"
+      },
+      "modeQA": {
+        "cloud": true,
+        "rendererCount": 1,
+        "top": true
+      },
+      "resetQA": {
+        "baseline": "false",
+        "phase": "true",
+        "sharedCanvasOwner": "tail",
+        "value": "70"
+      }
+    },
+    {
+      "topicId": "glass",
+      "before": {
+        "anomaly": 120,
+        "original": "35",
+        "valid": 315
+      },
+      "maximum": {
+        "anomaly": 201,
+        "value": "60"
+      },
+      "baselineQA": {
+        "anomaly": 0,
+        "disabled": true,
+        "label": "基准条件 · 定性示意"
+      },
+      "modeQA": {
+        "cloud": true,
+        "rendererCount": 1,
+        "top": true
+      },
+      "resetQA": {
+        "baseline": "false",
+        "phase": "true",
+        "sharedCanvasOwner": "glass",
+        "value": "35"
+      }
+    },
+    {
+      "topicId": "wet",
+      "before": {
+        "anomaly": 153,
+        "original": "70",
+        "valid": 493
+      },
+      "maximum": {
+        "anomaly": 203,
+        "value": "100"
+      },
+      "baselineQA": {
+        "anomaly": 0,
+        "disabled": true,
+        "label": "基准条件 · 定性示意"
+      },
+      "modeQA": {
+        "cloud": true,
+        "rendererCount": 1,
+        "top": true
+      },
+      "resetQA": {
+        "baseline": "false",
+        "phase": "true",
+        "sharedCanvasOwner": "wet",
+        "value": "70"
+      }
+    },
+    {
+      "topicId": "fog",
+      "before": {
+        "anomaly": 114,
+        "original": "60",
+        "valid": 513
+      },
+      "maximum": {
+        "anomaly": 190,
+        "value": "100"
+      },
+      "baselineQA": {
+        "anomaly": 0,
+        "disabled": true,
+        "label": "基准条件 · 定性示意"
+      },
+      "modeQA": {
+        "cloud": true,
+        "rendererCount": 1,
+        "top": true
+      },
+      "resetQA": {
+        "baseline": "false",
+        "phase": "true",
+        "sharedCanvasOwner": "fog",
+        "value": "60"
+      }
+    },
+    {
+      "topicId": "dirt",
+      "before": {
+        "anomaly": 26,
+        "original": "60",
+        "valid": 498
+      },
+      "maximum": {
+        "anomaly": 42,
+        "value": "100"
+      },
+      "baselineQA": {
+        "anomaly": 0,
+        "disabled": true,
+        "label": "基准条件 · 定性示意"
+      },
+      "modeQA": {
+        "cloud": true,
+        "rendererCount": 1,
+        "top": true
+      },
+      "resetQA": {
+        "baseline": "false",
+        "phase": "true",
+        "sharedCanvasOwner": "dirt",
+        "value": "60"
+      }
+    }
+  ],
+  "accessibility": {
+    "reducedMotion": "all eight paused at the point-cloud phase",
+    "withoutJavaScript": "all eight evaluation texts visible",
+    "keyboardCamera": "rotation changed the paused view",
+    "pause": "identical native viewport screenshot hashes"
+  },
+  "screenshots": [
+    "home-desktop.jpg",
+    "guide-desktop.jpg",
+    "range.jpg",
+    "precision.jpg",
+    "ghost.jpg",
+    "tail.jpg",
+    "glass.jpg",
+    "wet.jpg",
+    "fog.jpg",
+    "dirt.jpg"
+  ],
+  "captureNote": "Native viewport screenshots are used for pause stability; camera input and document clipping are checked separately."
+}

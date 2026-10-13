@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="八项简单可行的 LiDAR 硬件评测：有效距离、测距精度、强反鬼影、拖尾、玻璃、湿地面、雾与喷雾、窗口脏污。包含交互原理动画、录包回放步骤和报告内容。">
-  <meta name="theme-color" content="#123b3c">
+  <meta name="theme-color" content="#f7f3e9">
   <meta property="og:title" content="LiDAR 硬件评测｜Sensor Atlas">
   <meta property="og:description" content="用常见目标与真实场景，通过连续录包和回放检查点云质量。八项评测，八个原理动画。">
   <title>LiDAR 硬件评测｜Sensor Atlas</title>
@@ -20,9 +20,12 @@
     <aside class="topic-sidebar"><p class="eyebrow">评测目录 <span class="mono">01—08</span></p><nav class="topic-nav" role="tablist" aria-label="LiDAR 评测项目" aria-orientation="vertical">{{TOPIC_NAV}}</nav><div class="sidebar-note"><span class="mono">READ · RECORD · REPLAY</span><p>先看原理，再按步骤录包。<br>动画帮助理解，实测以回放为准。</p></div></aside>
     <main id="guide-main" class="guide-main">
       <div class="mobile-topic-picker"><label for="topic-select">选择评测项目</label><select id="topic-select">{{TOPIC_OPTIONS}}</select></div>
+      <div class="guide-intro"><span class="mono">FIELD PROTOCOL / V0.2</span><p>先统一条件，再观察差异。每项结果都对应一段可回放的数据。</p></div>
+      <details class="protocol-block"><summary>开始前：统一测试条件 <span>设备 · 环境 · 数据 · 显示</span></summary><div class="protocol-copy">{{PREPARATION}}<h3>判定与复核约定</h3>{{CONVENTIONS}}</div></details>
       <noscript><div class="notice">原理动画需要 JavaScript。以下八项测试正文仍可直接阅读，也可以下载 Markdown 标准。</div></noscript>
       {{TOPIC_PANELS}}
       <div class="guide-pagination"><button class="pagination-prev" type="button">← 上一项</button><span class="mono pagination-count">01 / 08</span><button class="pagination-next" type="button">下一项 →</button></div>
+      <details class="protocol-block report-template"><summary>报告模板 <span>条件表 + 逐项结果表</span></summary><div class="protocol-copy">{{REPORT_TEMPLATE}}<a class="text-link" href="./downloads/lidar-hardware-evaluation.md" download>下载正文与模板 ↓</a></div></details>
       <details class="sources-block"><summary>参考资料 <span class="mono">PRIMARY SOURCES</span></summary><ul>{{SOURCE_LINKS}}</ul></details>
       <div class="guide-disclaimer">页面动画是定性原理示意，不对应某一型号的性能数据。当前标准包含测试方法，实测案例尚待补充。</div>
     </main>

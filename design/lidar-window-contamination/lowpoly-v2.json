@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-13",
+  "selectedReference": {
+    "name": "The Aviator",
+    "author": "Karim Maaloul",
+    "url": "https://tympanus.net/Tutorials/TheAviator/",
+    "selection": "User chose reference 1."
+  },
+  "direction": [
+    "Visible polygon facets",
+    "Cream, mint and coral palette",
+    "A composed miniature test scene",
+    "Coordinated scanning sheet and return pulses",
+    "An intact physical target with dropout only in the return view"
+  ],
+  "implementation": "Original procedural geometry rendered in Three.js 0.186.1, vendored locally.",
+  "preview": "http://127.0.0.1:4173/lidar.html#dirt",
+  "keyframes": {
+    "dirty": "keyframe-lowpoly-v2.jpg",
+    "clean": "keyframe-clean-v2.jpg",
+    "capture": "Browser screenshots of the running WebGL scene, paused at emission phase with default settings."
+  },
+  "verification": {
+    "buildAndSyntax": "npm run build; npm run check; git diff --check passed.",
+    "responsiveWidths": [320, 390, 768, 1280],
+    "horizontalOverflow": false,
+    "controls": ["pollution minimum and maximum", "clean baseline", "restore and reset", "three phases", "camera presets", "scene/cloud mode", "topic switching"],
+    "pausedFrame": "Two scene screenshots had identical SHA-256 hashes.",
+    "reducedMotion": "With prefers-reduced-motion: reduce, the scene starts paused at the cloud phase.",
+    "playback": "The three phases were visually checked; the preview is left playing.",
+    "runtime": "No new warning or error after replacing the removed PCFSoftShadowMap with PCFShadowMap."
+  },
+  "scope": "Window contamination scene. Qualitative illustration; not a calibrated LiDAR simulator."
+}

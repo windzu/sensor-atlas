@@ -5,14 +5,14 @@ import path from 'node:path';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const checkOnly = process.argv.includes('--check');
 const meta = [
-  { id: 'range', subtitle: '目标能看多远', control: '示意距离', min: 5, max: 80, step: 5, value: 35, unit: 'm', insight: '距离增大，轮廓会变稀。实测以还能分辨出目标轮廓的距离为准。', kind: '基础性能' },
-  { id: 'precision', subtitle: '从侧面看平面厚度', control: '示意距离', min: 10, max: 80, step: 10, value: 40, unit: 'm', insight: '比较墙面厚度与墙角形态，同时看点云是否变稀。本项以不存在整体偏移为前提。', kind: '基础性能' },
-  { id: 'ghost', subtitle: '强回波之外的假目标', control: '强反影响', min: 0, max: 100, step: 10, value: 70, unit: 'level', insight: '重点检查真实物体之外的成团假点，以及轮廓向外膨胀的现象。', kind: '异常场景' },
-  { id: 'tail', subtitle: '边缘与背景之间的拉丝', control: '混合回波影响', min: 0, max: 100, step: 10, value: 70, unit: 'level', insight: '前景和背景之间本应为空。静止片段仍有粘连点，才有助于判断边缘拖尾。', kind: '异常场景' },
-  { id: 'glass', subtitle: '看见后方，未必看见玻璃', control: '观察角度示意', min: 0, max: 60, step: 5, value: 35, unit: '°', insight: '门框和玻璃后方的点，不算玻璃本身被检测到。', kind: '异常场景' },
-  { id: 'wet', subtitle: '水膜改变反射方向', control: '湿润／积水影响', min: 0, max: 100, step: 10, value: 70, unit: 'level', insight: '对照同种路面的干湿区域，观察地面缺点与不对应实物的异常点。', kind: '异常场景' },
-  { id: 'fog', subtitle: '目标变弱，空气产生回波', control: '水雾程度示意', min: 0, max: 100, step: 10, value: 60, unit: 'level', insight: '同时看真实目标损失了多少点、空气中增加了哪些点，并记录窗口是否被淋湿。', kind: '异常场景' },
-  { id: 'dirt', subtitle: '窗口污染影响整条光路', control: '窗口脏污程度', min: 0, max: 100, step: 10, value: 60, unit: 'level', insight: '观察污染位置对应的缺点区域，并在清洁后检查是否恢复。', kind: '异常场景' }
+  { id: 'range', subtitle: '从完整轮廓，到临界距离', control: '示意距离', min: 5, max: 80, step: 5, value: 35, unit: 'm', insight: '对比连续帧中的轮廓，而不是只数几个孤立点。', kind: '基础性能', visual: '距离增大 → 目标采样变稀', baseline: '近距离参考', labels: ['正面目标', '目标点云'], focus: '看轮廓连续性' },
+  { id: 'precision', subtitle: '沿平面法向，观察点云厚度', control: '示意距离', min: 10, max: 80, step: 10, value: 40, unit: 'm', insight: '墙面厚度反映离散程度；整体测距偏差需要独立真值。', kind: '基础性能', visual: '理想平面 → 法向残差与分层', baseline: '近距离参考', labels: ['平整墙面与墙角', '平面法向离散'], focus: '看厚度与分层' },
+  { id: 'ghost', subtitle: '把真实反光物，与异位回波分开', control: '强反影响示意', min: 0, max: 100, step: 10, value: 70, unit: 'level', insight: '轮廓膨胀与异位鬼影分别记录，先确认异常位置没有实物。', kind: '异常场景', visual: '强回波 → 膨胀与异位假点', baseline: '无异常参考', labels: ['反光牌与空旷背景', '膨胀 / 异位鬼影'], focus: '找真实轮廓外的点' },
+  { id: 'tail', subtitle: '前景到背景之间，本应是空的', control: '混合回波影响', min: 0, max: 100, step: 10, value: 70, unit: 'level', insight: '先检查静止单帧，再判断硬件边缘拖尾。', kind: '异常场景', visual: '边缘混合回波 → 空隙中的桥接点', baseline: '无异常参考', labels: ['前景边缘与背景墙', '空隙中的拖尾'], focus: '检查静止时的空隙' },
+  { id: 'glass', subtitle: '后方可见，不代表玻璃可见', control: '观察角度示意', min: 0, max: 60, step: 5, value: 35, unit: '°', insight: '分别检查玻璃表面、后方目标与疑似镜像。', kind: '异常场景', visual: '透射 / 反射 → 表面缺点与虚影', baseline: '正对观察参考', labels: ['玻璃与后方目标', '透射目标 / 疑似镜像'], focus: '分清三个空间区域' },
+  { id: 'wet', subtitle: '对照干湿区域，寻找缺点与伪点', control: '湿润／积水影响', min: 0, max: 100, step: 10, value: 70, unit: 'level', insight: '匹配距离与入射角，地面下方伪点需先排除姿态错误。', kind: '异常场景', visual: '地面反射变化 → 缺点与地面下方伪点', baseline: '干燥地面参考', labels: ['湿区与附近目标', '地面缺点 / 反射伪点'], focus: '同时看地上与地下' },
+  { id: 'fog', subtitle: '同时观察空气回波与目标损失', control: '水雾程度示意', min: 0, max: 100, step: 10, value: 60, unit: 'level', insight: '空气水雾与窗口水滴分开记录，喷雾程度不换算成能见度。', kind: '异常场景', visual: '水滴散射 → 空气回波与目标衰减', baseline: '清晰空气参考', labels: ['水雾与固定目标', '空气噪点 / 目标变稀'], focus: '目标与空气一起看' },
+  { id: 'dirt', subtitle: '污染之前、之后，再看清洁恢复', control: '窗口脏污程度', min: 0, max: 100, step: 10, value: 60, unit: 'level', insight: '点云变化、诊断告警与清洁恢复是三份独立证据。', kind: '异常场景', visual: '光路遮挡 → 局部缺点与近场异常', baseline: '清洁窗口参考', labels: ['污染窗口与目标墙', '缺点方向 / 近场噪点'], focus: '对照清洁前后' }
 ];
 const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const source = await readFile(path.join(root, 'content/lidar/hardware-evaluation.md'), 'utf8');
@@ -21,23 +21,55 @@ if (sections.length !== 8) throw new Error('Expected exactly eight numbered LiDA
 const topics = sections.map((match, i) => {
   if (Number(match[1]) !== i + 1) throw new Error('Evaluation section order is invalid.');
   const body = match[3];
-  const principle = body.match(/^\*\*基本原理\*\*：(.+)$/m)?.[1];
-  const objects = body.match(/^\*\*测试[^*]+\*\*：(.+)$/m)?.[1];
-  const report = body.match(/^\*\*报告内容\*\*：(.+)$/m)?.[1];
-  const steps = [...body.matchAll(/^- (.+)$/gm)].map((m) => m[1]);
-  if (!principle || !objects || !report || !steps.length) throw new Error('Incomplete section: ' + match[2]);
-  return { ...meta[i], number: String(i + 1).padStart(2, '0'), title: match[2], principle, objects, report, steps };
+  const field = (label) => body.match(new RegExp('^\\*\\*' + label + '\\*\\*：(.+)$', 'm'))?.[1];
+  const principle = field('基本原理'), objects = field('测试[^*]+'), report = field('报告内容');
+  const judgment = field('观察与判定'), review = field('复核要点');
+  const stepSection = body.split('**录包回放**：')[1]?.split('**观察与判定**')[0] || '';
+  const steps = [...stepSection.matchAll(/^- (.+)$/gm)].map((m) => m[1]);
+  if (!principle || !objects || !report || !judgment || !review || !steps.length) throw new Error('Incomplete section: ' + match[2]);
+  return { ...meta[i], number: String(i + 1).padStart(2, '0'), title: match[2], principle, objects, report, judgment, review, steps };
 });
-const panel = (t) => {
-  const controls = '<div class="animation-controls"><button type="button" class="play-button" aria-pressed="false">暂停动画 <span aria-hidden="true">Ⅱ</span></button><label for="slider-' + t.id + '">' + escape(t.control) + '<output id="value-' + t.id + '" for="slider-' + t.id + '">' + (t.unit === 'level' ? '中等' : t.value + ' ' + t.unit) + '</output><input id="slider-' + t.id + '" type="range" min="' + t.min + '" max="' + t.max + '" step="' + t.step + '" value="' + t.value + '" data-unit="' + t.unit + '"></label><button type="button" class="reset-button">重置</button></div>';
+
+// The common sections use a small, escaped Markdown subset: paragraphs and tables.
+function commonSection(title) {
+  const body = source.split('## ' + title + '\n')[1]?.split('\n## ')[0];
+  if (!body) throw new Error('Missing common section: ' + title);
+  return body.trim().split(/\n\s*\n/).map((block) => {
+    if (!block.startsWith('|')) return '<p>' + escape(block.replaceAll('\n', ' ')) + '</p>';
+    const rows = block.split('\n').filter((row) => !/^\|\s*[-:]+/.test(row)).map((row) => row.split('|').slice(1, -1).map((cell) => cell.trim()));
+    return '<div class="table-scroll" tabindex="0" role="region" aria-label="' + escape(title) + '表格"><table><thead><tr>' + rows[0].map((cell) => '<th scope="col">' + escape(cell) + '</th>').join('') + '</tr></thead><tbody>' + rows.slice(1).map((row) => '<tr>' + row.map((cell) => '<td>' + escape(cell) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
+  }).join('\n');
+}
+
+function panel(t) {
   const targets = t.id === 'range' ? '<div class="target-picker" role="group" aria-label="示意目标"><button class="active" type="button" data-target="person" aria-pressed="true">人</button><button type="button" data-target="car" aria-pressed="false">车</button><button type="button" data-target="rider" aria-pressed="false">骑行者</button><button type="button" data-target="cone" aria-pressed="false">锥桶</button></div>' : '';
-  return '<article id="' + t.id + '" class="topic-panel' + (t.number === '01' ? ' is-active' : '') + '" role="tabpanel" aria-labelledby="tab-' + t.id + '" tabindex="0"><div class="topic-title-row"><span class="topic-number mono">' + t.number + '</span><div><p class="eyebrow">' + escape(t.kind) + '</p><h2>' + escape(t.title) + '</h2><p class="topic-subtitle">' + escape(t.subtitle) + '</p></div></div><div class="principle-layout"><div class="animation-card"><div class="animation-topline"><span class="mono">FIG. ' + t.number + ' / PRINCIPLE</span><span class="small-pill">原理示意</span></div>' + targets + '<canvas class="principle-canvas" data-scene="' + t.id + '" width="900" height="440" role="img" aria-label="' + escape(t.title + '原理动画。' + t.insight) + '">' + escape(t.principle) + '</canvas><div class="animation-legend"><span><i class="legend-dot teal"></i>真实表面／有效回波</span><span><i class="legend-dot orange"></i>光束／异常回波</span></div>' + controls + '</div><div class="principle-copy"><span class="block-label mono">01 / 理解原理</span><p class="principle-text">' + escape(t.principle) + '</p><div class="insight"><span aria-hidden="true">↳</span><p>' + escape(t.insight) + '</p></div></div></div><div class="operation-grid"><section class="objects-block"><span class="block-label mono">02 / 选择场景</span><h3>用什么测</h3><p>' + escape(t.objects) + '</p></section><section class="steps-block"><span class="block-label mono">03 / 录包与回放</span><h3>现场怎么做</h3><ol>' + t.steps.map((s) => '<li>' + escape(s) + '</li>').join('') + '</ol></section></div><section class="report-block"><div><span class="block-label mono">04 / 保留证据</span><h3>报告里体现什么</h3></div><p>' + escape(t.report) + '</p></section></article>';
-};
+  return `<article id="${t.id}" class="topic-panel${t.number === '01' ? ' is-active' : ''}" role="tabpanel" aria-labelledby="tab-${t.id}" tabindex="0">
+    <div class="topic-title-row"><span class="topic-number mono">${t.number}</span><div><p class="eyebrow">${escape(t.kind)}</p><h2>${escape(t.title)}</h2><p class="topic-subtitle">${escape(t.subtitle)}</p></div><span class="focus-tag">${escape(t.focus)}</span></div>
+    <div class="principle-layout">
+      <div class="animation-card">
+        <div class="animation-topline"><span class="mono">FIG. ${t.number} / LIDAR LAB</span><span class="small-pill">定性原理演示</span></div>
+        <div class="scene-toolbar">${targets}<div class="view-picker" role="group" aria-label="显示方式"><button type="button" data-mode="compare" aria-pressed="true">场景 + 点云</button><button type="button" data-mode="cloud" aria-pressed="false">仅点云</button></div><div class="camera-picker" role="group" aria-label="观察视角"><button type="button" data-view="orbit" aria-pressed="true">斜视</button><button type="button" data-view="front" aria-pressed="false">正视</button><button type="button" data-view="side" aria-pressed="false">侧视</button><button type="button" data-view="top" aria-pressed="false">俯视</button></div></div>
+        <canvas class="principle-canvas" data-scene="${t.id}" width="1000" height="500" tabindex="0" role="img" aria-label="${escape(t.title + '三维场景与点云对照。' + t.visual + '。可拖动或用方向键调整视角。')}" aria-describedby="caption-${t.id}">${escape(t.principle)}</canvas>
+        <div class="scene-caption" id="caption-${t.id}"><span>${escape(t.visual)}</span><span class="scene-gesture">拖动旋转 · 方向键微调</span></div>
+        <div class="animation-legend"><span><i class="legend-dot teal"></i>有效表面点</span><span><i class="legend-dot orange"></i>异常点／光路</span><span><i class="legend-dot grey"></i>场景参考</span></div>
+        <div class="phase-picker" role="group" aria-label="演示阶段"><button type="button" data-phase="0" aria-pressed="true"><span class="mono">01</span> 发射扫描</button><button type="button" data-phase="1" aria-pressed="false"><span class="mono">02</span> 回波返回</button><button type="button" data-phase="2" aria-pressed="false"><span class="mono">03</span> 点云成像</button></div>
+        <div class="animation-controls"><button type="button" class="play-button" aria-pressed="false">暂停 <span aria-hidden="true">Ⅱ</span></button><label for="slider-${t.id}">${escape(t.control)}<output id="value-${t.id}" for="slider-${t.id}">${t.unit === 'level' ? '中等' : t.value + ' ' + t.unit}</output><input id="slider-${t.id}" type="range" min="${t.min}" max="${t.max}" step="${t.step}" value="${t.value}" data-unit="${t.unit}"></label><button type="button" class="baseline-button" aria-pressed="false" data-baseline-label="${escape(t.baseline)}">查看基准</button><button type="button" class="reset-button">重置</button></div>
+      </div>
+      <div class="principle-copy"><div><span class="block-label mono">01 / 理解原理</span><p class="principle-text">${escape(t.principle)}</p></div><div class="insight"><span aria-hidden="true">↳</span><p>${escape(t.insight)}</p></div></div>
+    </div>
+    <div class="operation-grid"><section class="objects-block"><span class="block-label mono">02 / 选择场景</span><h3>用什么测</h3><p>${escape(t.objects)}</p><div class="review-note"><span>复核要点</span><p>${escape(t.review)}</p></div></section><section class="steps-block"><span class="block-label mono">03 / 录包与回放</span><h3>现场怎么做</h3><ol>${t.steps.map((s) => '<li>' + escape(s) + '</li>').join('')}</ol></section></div>
+    <section class="judgment-block"><span class="block-label mono">04 / 观察与判定</span><h3>什么结果才有依据</h3><p>${escape(t.judgment)}</p></section>
+    <section class="report-block"><div><span class="block-label mono">05 / 保留证据</span><h3>报告里体现什么</h3></div><p>${escape(t.report)}</p></section>
+  </article>`;
+}
 const sources = [...source.split('## 参考资料')[1].matchAll(/\[([^\]]+)\]\((https:\/\/[^)]+)\)/g)];
 const replacements = {
   TOPIC_NAV: topics.map((t) => '<a id="tab-' + t.id + '" href="#' + t.id + '" data-topic="' + t.id + '" role="tab" aria-controls="' + t.id + '" aria-selected="' + (t.number === '01') + '" tabindex="' + (t.number === '01' ? '0' : '-1') + '"><span class="mono">' + t.number + '</span><span>' + escape(t.title) + '</span><span class="topic-nav-arrow" aria-hidden="true">↗</span></a>').join(''),
   TOPIC_OPTIONS: topics.map((t) => '<option value="' + t.id + '">' + t.number + ' · ' + escape(t.title) + '</option>').join(''),
   TOPIC_PANELS: topics.map(panel).join('\n'),
+  PREPARATION: commonSection('评测前准备'),
+  CONVENTIONS: commonSection('判定与复核约定'),
+  REPORT_TEMPLATE: commonSection('报告模板'),
   SOURCE_LINKS: sources.map((s) => '<li><a href="' + escape(s[2]) + '" target="_blank" rel="noopener noreferrer">' + escape(s[1]) + ' ↗</a></li>').join('')
 };
 const outputs = new Map();
@@ -58,6 +90,11 @@ async function walk(dir, prefix = '') {
   }
 }
 await walk(path.join(root, 'web'));
+// Vendor the pinned Three.js runtime so the static site works without a CDN.
+for (const name of ['three.module.js', 'three.core.js']) {
+  outputs.set('assets/vendor/' + name, await readFile(path.join(root, 'node_modules/three/build', name)));
+}
+outputs.set('assets/vendor/THREE-LICENSE.txt', await readFile(path.join(root, 'node_modules/three/LICENSE')));
 outputs.set('downloads/lidar-hardware-evaluation.md', Buffer.from(source));
 outputs.set('assets/topics.json', Buffer.from(JSON.stringify(topics, null, 2) + '\n'));
 outputs.set('.nojekyll', Buffer.from(''));

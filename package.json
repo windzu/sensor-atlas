@@ -1,12 +1,16 @@
 {
   "name": "sensor-atlas",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Sensors for autonomous driving and robotics: principles and practical evaluation.",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check": "node --check web/assets/app.js && node --check web/assets/animation.js && node scripts/build.mjs --check",
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check web/assets/app.js && node --check web/assets/animation.js && node --check web/assets/lowpoly-scene.js && node --check web/assets/scene-models.js && node --check web/assets/scene-data.js && node scripts/build.mjs --check",
     "preview": "node scripts/serve.mjs"
+  },
+  "devDependencies": {
+    "three": "0.186.1"
   }
 }
