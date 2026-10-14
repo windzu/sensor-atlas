@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { cameraMeta } from '../web/assets/camera-data.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const checkOnly = process.argv.includes('--check');
@@ -16,9 +17,11 @@ const meta = [
 ];
 const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const source = await readFile(path.join(root, 'content/lidar/hardware-evaluation.md'), 'utf8');
+const cameraSource = await readFile(path.join(root, 'content/camera/hardware-evaluation.md'), 'utf8');
+function parseTopics(source, metadata, label) {
 const sections = [...source.matchAll(/^## (\d+)\. ([^\n]+)\n([\s\S]*?)(?=^## |$(?![\s\S]))/gm)];
-if (sections.length !== 8) throw new Error('Expected exactly eight numbered LiDAR evaluation sections.');
-const topics = sections.map((match, i) => {
+if (sections.length !== metadata.length) throw new Error('Expected ' + metadata.length + ' numbered ' + label + ' evaluation sections.');
+return sections.map((match, i) => {
   if (Number(match[1]) !== i + 1) throw new Error('Evaluation section order is invalid.');
   const body = match[3];
   const field = (label) => body.match(new RegExp('^\\*\\*' + label + '\\*\\*：(.+)$', 'm'))?.[1];
@@ -27,11 +30,14 @@ const topics = sections.map((match, i) => {
   const stepSection = body.split('**录包回放**：')[1]?.split('**观察与判定**')[0] || '';
   const steps = [...stepSection.matchAll(/^- (.+)$/gm)].map((m) => m[1]);
   if (!principle || !objects || !report || !judgment || !review || !steps.length) throw new Error('Incomplete section: ' + match[2]);
-  return { ...meta[i], number: String(i + 1).padStart(2, '0'), title: match[2], principle, objects, report, judgment, review, steps };
+  return { ...metadata[i], number: String(i + 1).padStart(2, '0'), title: match[2], principle, objects, report, judgment, review, steps };
 });
+}
+const topics = parseTopics(source, meta, 'LiDAR');
+const cameraTopics = parseTopics(cameraSource, cameraMeta, 'Camera');
 
 // The common sections use a small, escaped Markdown subset: paragraphs and tables.
-function commonSection(title) {
+function commonSection(title, source) {
   const body = source.split('## ' + title + '\n')[1]?.split('\n## ')[0];
   if (!body) throw new Error('Missing common section: ' + title);
   return body.trim().split(/\n\s*\n/).map((block) => {
@@ -41,12 +47,12 @@ function commonSection(title) {
   }).join('\n');
 }
 
-function panel(t) {
+function panel(t, sensor) {
   const targets = t.id === 'range' ? '<div class="target-picker" role="group" aria-label="示意目标"><button class="active" type="button" data-target="person" aria-pressed="true">人</button><button type="button" data-target="car" aria-pressed="false">车</button><button type="button" data-target="rider" aria-pressed="false">骑行者</button><button type="button" data-target="cone" aria-pressed="false">锥桶</button></div>' : '';
   return `<article id="${t.id}" class="topic-panel${t.number === '01' ? ' is-active' : ''}" role="tabpanel" aria-labelledby="tab-${t.id}" tabindex="0">
     <div class="topic-title-row"><span class="topic-number mono">${t.number}</span><div><p class="eyebrow">${escape(t.kind)}</p><h2>${escape(t.title)}</h2><p class="topic-subtitle">${escape(t.subtitle)}</p></div><span class="focus-tag">${escape(t.focus)}</span></div>
     <div class="principle-layout">
-      <div class="animation-card">
+      ${sensor === 'camera' ? cameraVisual(t) : `<div class="animation-card">
         <div class="animation-topline"><span class="mono">FIG. ${t.number} / LIDAR LAB</span><span class="small-pill">定性原理演示</span></div>
         <div class="scene-toolbar">${targets}<div class="view-picker" role="group" aria-label="显示方式"><button type="button" data-mode="compare" aria-pressed="true">场景 + 点云</button><button type="button" data-mode="cloud" aria-pressed="false">仅点云</button></div><div class="camera-picker" role="group" aria-label="观察视角"><button type="button" data-view="orbit" aria-pressed="true">斜视</button><button type="button" data-view="front" aria-pressed="false">正视</button><button type="button" data-view="side" aria-pressed="false">侧视</button><button type="button" data-view="top" aria-pressed="false">俯视</button></div></div>
         <canvas class="principle-canvas" data-scene="${t.id}" width="1000" height="500" tabindex="0" role="img" aria-label="${escape(t.title + '三维场景与点云对照。' + t.visual + '。可拖动或用方向键调整视角。')}" aria-describedby="caption-${t.id}">${escape(t.principle)}</canvas>
@@ -54,7 +60,7 @@ function panel(t) {
         <div class="animation-legend"><span><i class="legend-dot teal"></i>有效表面点</span><span><i class="legend-dot orange"></i>异常点／光路</span><span><i class="legend-dot grey"></i>场景参考</span></div>
         <div class="phase-picker" role="group" aria-label="演示阶段"><button type="button" data-phase="0" aria-pressed="true"><span class="mono">01</span> 发射扫描</button><button type="button" data-phase="1" aria-pressed="false"><span class="mono">02</span> 回波返回</button><button type="button" data-phase="2" aria-pressed="false"><span class="mono">03</span> 点云成像</button></div>
         <div class="animation-controls"><button type="button" class="play-button" aria-pressed="false">暂停 <span aria-hidden="true">Ⅱ</span></button><label for="slider-${t.id}">${escape(t.control)}<output id="value-${t.id}" for="slider-${t.id}">${t.unit === 'level' ? '中等' : t.value + ' ' + t.unit}</output><input id="slider-${t.id}" type="range" min="${t.min}" max="${t.max}" step="${t.step}" value="${t.value}" data-unit="${t.unit}"></label><button type="button" class="baseline-button" aria-pressed="false" data-baseline-label="${escape(t.baseline)}">查看基准</button><button type="button" class="reset-button">重置</button></div>
-      </div>
+      </div>`}
       <div class="principle-copy"><div><span class="block-label mono">01 / 理解原理</span><p class="principle-text">${escape(t.principle)}</p></div><div class="insight"><span aria-hidden="true">↳</span><p>${escape(t.insight)}</p></div></div>
     </div>
     <div class="operation-grid"><section class="objects-block"><span class="block-label mono">02 / 选择场景</span><h3>用什么测</h3><p>${escape(t.objects)}</p><div class="review-note"><span>复核要点</span><p>${escape(t.review)}</p></div></section><section class="steps-block"><span class="block-label mono">03 / 录包与回放</span><h3>现场怎么做</h3><ol>${t.steps.map((s) => '<li>' + escape(s) + '</li>').join('')}</ol></section></div>
@@ -62,16 +68,29 @@ function panel(t) {
     <section class="report-block"><div><span class="block-label mono">05 / 保留证据</span><h3>报告里体现什么</h3></div><p>${escape(t.report)}</p></section>
   </article>`;
 }
-const sources = [...source.split('## 参考资料')[1].matchAll(/\[([^\]]+)\]\((https:\/\/[^)]+)\)/g)];
-const replacements = {
+function cameraVisual(t) {
+  const targets = t.id === 'detail' ? '<div class="target-picker" role="group" aria-label="示意目标"><button class="active" type="button" data-target="person" aria-pressed="true">人</button><button type="button" data-target="car" aria-pressed="false">车</button><button type="button" data-target="rider" aria-pressed="false">骑行者</button><button type="button" data-target="cone" aria-pressed="false">锥桶</button></div>' : '';
+  return `<div class="animation-card camera-card">
+    <div class="animation-topline"><span class="mono">FIG. ${t.number} / CAMERA LAB</span><span class="small-pill">定性${t.id === 'timing' ? '时序' : '成像'}演示</span></div>${targets ? '\n    <div class="scene-toolbar">' + targets + '</div>' : ''}
+    <canvas class="camera-canvas" data-camera="${t.id}" width="1000" height="395" role="img" aria-label="${escape(t.title + '基准与当前条件对照。' + t.visual)}" aria-describedby="caption-${t.id}">${escape(t.principle)}</canvas>
+    <div class="scene-caption" id="caption-${t.id}"><span>${escape(t.visual)}</span><span>示意图 · 非实测图像</span></div>
+    <div class="animation-controls"><button type="button" class="play-button" aria-pressed="false">暂停 <span aria-hidden="true">Ⅱ</span></button><label for="slider-${t.id}">${escape(t.control)}<output for="slider-${t.id}">中等</output><input id="slider-${t.id}" type="range" min="0" max="100" step="10" value="${t.value}" data-unit="level"></label><button type="button" class="baseline-button" aria-pressed="false" data-baseline-label="${escape(t.baseline)}">查看基准</button><button type="button" class="reset-button">重置</button></div>
+  </div>`;
+}
+function guideReplacements(source, topics, sensor) {
+const sources = [...(source.split('## 参考资料')[1] || '').matchAll(/\[([^\]]+)\]\((https:\/\/[^)]+)\)/g)];
+return {
   TOPIC_NAV: topics.map((t) => '<a id="tab-' + t.id + '" href="#' + t.id + '" data-topic="' + t.id + '" role="tab" aria-controls="' + t.id + '" aria-selected="' + (t.number === '01') + '" tabindex="' + (t.number === '01' ? '0' : '-1') + '"><span class="mono">' + t.number + '</span><span>' + escape(t.title) + '</span><span class="topic-nav-arrow" aria-hidden="true">↗</span></a>').join(''),
   TOPIC_OPTIONS: topics.map((t) => '<option value="' + t.id + '">' + t.number + ' · ' + escape(t.title) + '</option>').join(''),
-  TOPIC_PANELS: topics.map(panel).join('\n'),
-  PREPARATION: commonSection('评测前准备'),
-  CONVENTIONS: commonSection('判定与复核约定'),
-  REPORT_TEMPLATE: commonSection('报告模板'),
+  TOPIC_PANELS: topics.map((t) => panel(t, sensor)).join('\n'),
+  PREPARATION: commonSection('评测前准备', source),
+  CONVENTIONS: commonSection('判定与复核约定', source),
+  REPORT_TEMPLATE: commonSection('报告模板', source),
   SOURCE_LINKS: sources.map((s) => '<li><a href="' + escape(s[2]) + '" target="_blank" rel="noopener noreferrer">' + escape(s[1]) + ' ↗</a></li>').join('')
 };
+}
+const replacements = guideReplacements(source, topics, 'lidar');
+const cameraReplacements = guideReplacements(cameraSource, cameraTopics, 'camera');
 const outputs = new Map();
 async function walk(dir, prefix = '') {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -81,7 +100,8 @@ async function walk(dir, prefix = '') {
       let data = await readFile(path.join(dir, entry.name));
       if (entry.name.endsWith('.html')) {
         let html = data.toString();
-        for (const [key, value] of Object.entries(replacements)) html = html.replaceAll('{{' + key + '}}', value);
+        const guide = entry.name === 'camera.html' ? cameraReplacements : replacements;
+        for (const [key, value] of Object.entries(guide)) html = html.replaceAll('{{' + key + '}}', value);
         if (/\{\{[A-Z_]+\}\}/.test(html)) throw new Error('Unfilled template: ' + relative);
         data = Buffer.from(html);
       }
@@ -96,7 +116,9 @@ for (const name of ['three.module.js', 'three.core.js']) {
 }
 outputs.set('assets/vendor/THREE-LICENSE.txt', await readFile(path.join(root, 'node_modules/three/LICENSE')));
 outputs.set('downloads/lidar-hardware-evaluation.md', Buffer.from(source));
+outputs.set('downloads/camera-hardware-evaluation.md', Buffer.from(cameraSource));
 outputs.set('assets/topics.json', Buffer.from(JSON.stringify(topics, null, 2) + '\n'));
+outputs.set('assets/camera-topics.json', Buffer.from(JSON.stringify(cameraTopics, null, 2) + '\n'));
 outputs.set('.nojekyll', Buffer.from(''));
 outputs.set('404.html', Buffer.from('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>页面未找到｜Sensor Atlas</title><style>body{font:18px system-ui;background:#f5f4ee;color:#163a3a;max-width:600px;margin:15vh auto;padding:24px}a{color:#087c85}</style><h1>这张图谱还没有这一页。</h1><p>返回专题目录，继续阅读。</p><a href="./">Sensor Atlas 首页 →</a></html>'));
 for (const [relative, data] of outputs) {
@@ -110,4 +132,4 @@ for (const [relative, data] of outputs) {
     await writeFile(file, data);
   }
 }
-process.stdout.write((checkOnly ? 'Verified' : 'Built') + ' ' + outputs.size + ' static files, 8 evaluation sections.\n');
+process.stdout.write((checkOnly ? 'Verified' : 'Built') + ' ' + outputs.size + ' static files, ' + (topics.length + cameraTopics.length) + ' evaluation sections.\n');

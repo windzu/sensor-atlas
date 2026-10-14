@@ -2,7 +2,7 @@ import { AtlasScene } from './animation.js';
 
 const canvases = [...document.querySelectorAll('canvas[data-scene]')];
 let LowPolyScene;
-try { ({ LowPolyScene } = await import('./lowpoly-scene.js')); }
+try { if (canvases.length) ({ LowPolyScene } = await import('./lowpoly-scene.js')); }
 catch (error) { console.warn('3D scenes unavailable; using the geometric view.', error); }
 const scenes = canvases.map((canvas) => {
   if (LowPolyScene) {
@@ -11,11 +11,17 @@ const scenes = canvases.map((canvas) => {
   }
   return new AtlasScene(canvas);
 });
+const cameraCanvases = [...document.querySelectorAll('canvas[data-camera]')];
+if (cameraCanvases.length) {
+  const { CameraScene } = await import('./camera-scene.js');
+  scenes.push(...cameraCanvases.map((canvas) => new CameraScene(canvas)));
+}
+const panelCanvas = (panel) => panel.querySelector('canvas[data-scene], canvas[data-camera]');
 const sceneFor = (canvas) => scenes.find((scene) => scene.canvas === canvas);
 const fmt = (value, unit) => unit === 'level' ? (value === 0 ? '无影响参考' : value <= 30 ? '轻微' : value <= 60 ? '中等' : '明显') : value + ' ' + unit;
 
 for (const panel of document.querySelectorAll('.topic-panel')) {
-  const scene = sceneFor(panel.querySelector('canvas[data-scene]'));
+  const scene = sceneFor(panelCanvas(panel));
   const slider = panel.querySelector('input[type=range]'), output = panel.querySelector('output');
   const play = panel.querySelector('.play-button'), baseline = panel.querySelector('.baseline-button');
   const original = Number(slider.value);
@@ -59,7 +65,7 @@ for (const panel of document.querySelectorAll('.topic-panel')) {
   panel.querySelector('.reset-button').addEventListener('click', () => {
     slider.value = original; scene.paused = scene.motionPreference.matches; scene.reset();
     group('[data-target]', 'data-target', 'person'); group('[data-mode]', 'data-mode', 'compare');
-    scene.onView('orbit'); scene.onPhase(scene.phase); refreshValue(); refreshPlay();
+    scene.onView?.('orbit'); scene.onPhase?.(scene.phase); refreshValue(); refreshPlay();
   });
   refreshPlay(); refreshValue(); scene.onPhase(scene.phase);
 }
@@ -91,14 +97,14 @@ if (tabs.length) {
     tabs.forEach((tab, i) => { tab.setAttribute('aria-selected', String(i === index)); tab.tabIndex = i === index ? 0 : -1; });
     select.value = panels[index].id;
     previous.disabled = index === 0; next.disabled = index === panels.length - 1;
-    document.querySelector('.pagination-count').textContent = String(index + 1).padStart(2, '0') + ' / 08';
-    document.title = panels[index].querySelector('h2').textContent + ' · LiDAR 评测｜Sensor Atlas';
+    document.querySelector('.pagination-count').textContent = String(index + 1).padStart(2, '0') + ' / ' + String(panels.length).padStart(2, '0');
+    document.title = panels[index].querySelector('h2').textContent + ' · ' + (document.body.dataset.sensor === 'camera' ? '相机评测' : 'LiDAR 评测') + '｜Sensor Atlas';
     if (updateUrl) history.replaceState(null, '', '#' + panels[index].id);
     if (focus) {
       panels[index].focus({ preventScroll: true });
       panels[index].scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
     }
-    sceneFor(panels[index].querySelector('canvas[data-scene]')).draw();
+    sceneFor(panelCanvas(panels[index])).draw();
   }
   activate(location.hash.slice(1), false);
   for (const [index, tab] of tabs.entries()) {

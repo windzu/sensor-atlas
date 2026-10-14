@@ -66,6 +66,10 @@ h1{line-height:1.25}h2{line-height:1.4}h3{line-height:1.5}
 .section-heading h2{font-size:27px;margin-top:11px}
 .chapter-card{display:grid;grid-template-columns:28% 1fr 64px;background:var(--surface);border:1px solid #d5ddc9;border-radius:10px;overflow:hidden;position:relative;transition:box-shadow .2s}
 .chapter-card:hover{box-shadow:0 12px 35px #68775b0c}
+.chapter-card+.chapter-card{margin-top:18px}
+.camera-art{background:#e9e4cd}
+.camera-canvas{aspect-ratio:1000/395}
+body.guide-page:not(.js-ready) .camera-canvas{display:none}
 .chapter-art{min-height:245px;background:#e2e7cd;position:relative;overflow:hidden;padding:25px;display:flex;align-items:center;justify-content:center;color:#7f9b7e}
 .chapter-art svg{width:84%;max-width:280px}
 .chapter-big-number{font-family:Georgia,serif;font-size:25px;font-style:italic;position:absolute;top:19px;left:23px;color:#8da082}

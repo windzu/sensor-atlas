@@ -7,6 +7,8 @@
 - [展示网站](https://windzu.github.io/sensor-atlas/)
 - [LiDAR 硬件评测专题](https://windzu.github.io/sensor-atlas/lidar.html)
 - [LiDAR 硬件评测标准正文](content/lidar/hardware-evaluation.md)
+- [相机成像与时序评测正文](content/camera/hardware-evaluation.md)
+- [相机成像与时序评测专题](https://windzu.github.io/sensor-atlas/camera.html)
 
 ## 首个专题：LiDAR 硬件评测
 
@@ -31,16 +33,25 @@
 
 Three.js 固定为 0.186.1，构建时将运行时与许可证复制到本地静态资源目录，无运行时 CDN 请求。视觉母本为 [Karim Maaloul 的 The Aviator](https://tympanus.net/Tutorials/TheAviator/)，场景模型与动画在本项目内重新编写。
 
+## 相机成像与时序评测
+
+新增十项轻量现场测试：视场／畸变与几何一致性、细节分辨与对焦、低照度／噪声、逆光／HDR／明暗切换、LED 闪烁、运动模糊、Rolling Shutter、时间戳／同步／帧完整性、雨雾、镜头／保护窗脏污与结露。
+
+每项包含原理、测试目标、采集回放、判定、复核和报告内容，附统一条件表、逐项报告模板及官方参考资料。成像与时序交互示意支持程度调节、基准对照、暂停／重置与细节目标选择，移动端纵向展示两幅对照图。演示为定性示意，不能据此读取设备性能参数。
+
+评测针对镜头、传感器、ISP 与采集链路的实际组合，明确区分图像可分辨与算法检出、曝光时刻与接收时刻、时钟同步与曝光同步。现场方法不替代实验室 MTF、EMVA 1288 或可靠性认证。
+
 ## 内容维护
 
-专题正文维护在 `content/lidar/hardware-evaluation.md`。构建脚本从正文生成页面内容，保证展示页与标准正文一致。
+专题正文分别维护在 `content/lidar/hardware-evaluation.md` 和 `content/camera/hardware-evaluation.md`。构建脚本从正文生成页面、目录数据与下载正文，保证展示页和文档一致。
 
 - `content/`：专题 Markdown 正文。
 - `web/`：页面模板、样式及原理动画。
 - `web/assets/scene-models.js`：多边形场景造型与表面采样。
 - `web/assets/scene-data.js`：各项点云变化的定性规则。
 - `web/assets/lowpoly-scene.js`：共用 3D 渲染、视角、运动与观察窗。
-- `tests/`：各类评测现象与点云数据的约束验证。
+- `web/assets/camera-data.js`、`camera-scene.js`：相机专题元数据、成像与时序示意。
+- `tests/`：点云、成像及时序示意，以及生成内容一致性的约束验证。
 - `scripts/`：构建与预览脚本，构建时包含固定版本的 Three.js 本地资源。
 - `docs/`：生成后的 GitHub Pages 静态页面。
 

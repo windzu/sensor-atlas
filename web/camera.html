@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="十项相机成像与时序评测：几何、细节、低照度、HDR、LED 闪烁、运动模糊、Rolling Shutter、同步与丢帧、雨雾、镜头脏污。包含交互示意、现场操作与报告模板。">
+  <meta name="theme-color" content="#f7f3e9">
+  <meta property="og:title" content="相机成像与时序评测｜Sensor Atlas">
+  <meta property="og:description" content="从光学成像到曝光时序。十项现场评测，保留原始图像、逐帧配置与同步证据。">
+  <title>相机成像与时序评测｜Sensor Atlas</title>
+  <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./assets/style.css">
+  <script type="module" src="./assets/app.js"></script>
+</head>
+<body class="guide-page" data-sensor="camera">
+  <a class="skip-link" href="#guide-main">跳到正文</a>
+  <header class="site-header"><div class="header-inner"><a class="brand" href="./" aria-label="Sensor Atlas 首页"><img src="./assets/mark.svg" width="35" height="35" alt=""><span>sensor<span class="brand-light">atlas</span><span class="brand-dot">.</span></span></a><nav aria-label="主导航"><a href="./#topics">专题目录</a><a href="lidar.html">LiDAR 评测</a><a class="current" href="camera.html">相机评测</a><a class="github-link" href="https://github.com/windzu/sensor-atlas" target="_blank" rel="noopener noreferrer">GitHub ↗</a></nav></div></header>
+  <section class="guide-heading wrap"><div><a class="breadcrumb" href="./#topics">图谱 <span aria-hidden="true">/</span> CHAPTER 02</a><h1>相机成像与时序评测<span class="chapter-label mono">FIELD GUIDE</span></h1><p>从镜头成像到多传感器时序。十项现场测试，每项都留下可复核的图像与日志。</p></div><a class="button secondary download-link" href="./downloads/camera-hardware-evaluation.md" download>下载评测指南 <span aria-hidden="true">↓</span></a></section>
+  <div class="guide-layout wrap">
+    <aside class="topic-sidebar"><p class="eyebrow">评测目录 <span class="mono">01—10</span></p><nav class="topic-nav" role="tablist" aria-label="相机评测项目" aria-orientation="vertical">{{TOPIC_NAV}}</nav><div class="sidebar-note"><span class="mono">READ · RECORD · REPLAY</span><p>先看原理，再按步骤录包。<br>动画帮助理解，实测以回放为准。</p></div></aside>
+    <main id="guide-main" class="guide-main">
+      <div class="mobile-topic-picker"><label for="topic-select">选择评测项目</label><select id="topic-select">{{TOPIC_OPTIONS}}</select></div>
+      <div class="guide-intro"><span class="mono">FIELD PROTOCOL / V0.1</span><p>先统一条件，再观察差异。每项结果都对应一段可回放的数据。</p></div>
+      <details class="protocol-block"><summary>开始前：统一测试条件 <span>设备 · 环境 · 数据 · 显示</span></summary><div class="protocol-copy">{{PREPARATION}}<h3>判定与复核约定</h3>{{CONVENTIONS}}</div></details>
+      <noscript><div class="notice">原理动画需要 JavaScript。以下十项测试正文仍可直接阅读，也可以下载 Markdown 指南。</div></noscript>
+      {{TOPIC_PANELS}}
+      <div class="guide-pagination"><button class="pagination-prev" type="button">← 上一项</button><span class="mono pagination-count">01 / 10</span><button class="pagination-next" type="button">下一项 →</button></div>
+      <details class="protocol-block report-template"><summary>报告模板 <span>条件表 + 逐项结果表</span></summary><div class="protocol-copy">{{REPORT_TEMPLATE}}<a class="text-link" href="./downloads/camera-hardware-evaluation.md" download>下载正文与模板 ↓</a></div></details>
+      <details class="sources-block"><summary>参考资料 <span class="mono">PRIMARY SOURCES</span></summary><ul>{{SOURCE_LINKS}}</ul></details>
+      <div class="guide-disclaimer">页面图像与时序图为定性演示，示意程度不对应设备参数。当前指南包含测试方法，实测案例尚待补充；不替代 MTF、EMVA 1288 或可靠性认证测试。</div>
+    </main>
+  </div>
+  <footer class="site-footer wrap"><a class="brand footer-brand" href="./">Sensor Atlas<span class="brand-dot">.</span></a><span>自驾与机器人传感器指南</span><a href="https://github.com/windzu/sensor-atlas" target="_blank" rel="noopener noreferrer">公开仓库 ↗</a></footer>
+</body>
+</html>

@@ -7,7 +7,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check web/assets/app.js && node --check web/assets/animation.js && node --check web/assets/lowpoly-scene.js && node --check web/assets/scene-models.js && node --check web/assets/scene-data.js && node scripts/build.mjs --check",
+    "check": "node --check web/assets/app.js && node --check web/assets/animation.js && node --check web/assets/lowpoly-scene.js && node --check web/assets/scene-models.js && node --check web/assets/scene-data.js && node --check web/assets/camera-data.js && node --check web/assets/camera-scene.js && node scripts/build.mjs --check",
     "preview": "node scripts/serve.mjs"
   },
   "devDependencies": {

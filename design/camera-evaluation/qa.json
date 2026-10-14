@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-15",
+  "page": "camera.html",
+  "viewports": [
+    { "width": 1280, "height": 1000, "horizontalOverflow": false, "capture": "desktop-guide.png" },
+    { "width": 390, "height": 844, "horizontalOverflow": false, "capture": "mobile-timing.png" }
+  ],
+  "browserChecks": [
+    "Ten topics switch with matching title, hash and pagination",
+    "Detail target selection and slider update",
+    "Baseline disables slider; reset restores target, value and controls",
+    "Reduced motion starts paused",
+    "All ten protocols readable without JavaScript; inactive controls hidden",
+    "LiDAR retains eight initialized scenes and 01 / 08 pagination",
+    "Home exposes both topic cards",
+    "No camera console errors or warnings"
+  ],
+  "automated": { "build": "passed", "check": "passed", "testsPassed": 15 },
+  "scope": "Qualitative illustrations and field protocols; no measured camera performance or certification claims."
+}
